@@ -1,0 +1,32 @@
+# Secrets: never commit real env files
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+build/
+dist/
+
+# Tool caches and reports
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Frontend
+node_modules/
+frontend/dist/
+.vercel/
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

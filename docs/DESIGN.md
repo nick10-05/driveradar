@@ -1,11 +1,15 @@
-# DriveRadar — Design Doc (v2.0)
+# DriveRadar — Design Doc (v2.1)
 
 Placement-notice tracker for my college batch, with AI-assisted notice extraction. Portfolio project, ~14 days, ₹0/month.
-Status: **v2.0, decisions locked** (2026-11-18). Change decisions here first, then in code.
+Status: **v2.1, decisions locked** (2026-11-18). Change decisions here first, then in code.
 
 ---
 
 ## Changelog
+
+### v2.1 (2026-11-18)
+- **D2:** development runs in **WSL2 Ubuntu**. Windows Smart App Control blocks the unsigned executables and compiled extensions inside native Python venvs, so native Windows Python is unreliable. WSL also matches CI, Docker and Render (all Linux).
+- **Stack:** SQLAlchemy **2.1** (the same 2.0-style API). FastAPI is installed with the `standard-no-fastapi-cloud-cli` extra, which keeps the cloud CLI and sentry-sdk out of the dependencies.
 
 ### v2.0 (2026-11-18)
 - **AI extraction replaces the regex parser.** An LLM turns notice text into a typed draft through structured output. Pydantic validates it, a deterministic normaliser cleans it up and checks its evidence, and an admin approves it before it's published (§4).
@@ -33,7 +37,7 @@ Status: **v2.0, decisions locked** (2026-11-18). Change decisions here first, th
 | # | Decision |
 |---|---|
 | **D1 Runtime** | Python 3.13 + FastAPI, with **uv** managing Python, dependencies and the lockfile. If a dependency breaks on 3.13, flag it. Don't switch versions silently. |
-| **D2 Dev setup** | Local Windows development with VS Code + Claude Code. GitHub repo named `driveradar`. |
+| **D2 Dev setup** | Windows 11 host, with Python tooling running in **WSL2 Ubuntu** (uv, tests, dev server, Docker CLI, and **git**, so the pre-commit hook can use the Linux venv). The repo lives at `C:\Users\NICK\driveradar` (`/mnt/c/...` in WSL). The venv lives on the Linux filesystem (`UV_PROJECT_ENVIRONMENT=~/.venvs/driveradar-backend`). VS Code + Claude Code. GitHub repo named `driveradar`. |
 | **D3 Cost: ₹0, no payment card** | Applies to **everything**, the LLM included. Backend: Render Free. DB: Neon Postgres free. Frontend: Vercel Hobby. LLM: only a free tier that needs no card, a local model, or none. If any signup asks for a card, stop and pick another option. |
 | **D4 Ingestion** | Every source (TPO email, WhatsApp, portal, Telegram) goes through one path: paste (or forward to the bot) → AI extraction → validation + normalisation → admin review → publish. No scraping. (§4) |
 | **D5 Alerts** | Telegram bot in v1. WhatsApp alerts in v2. |
@@ -44,7 +48,7 @@ Status: **v2.0, decisions locked** (2026-11-18). Change decisions here first, th
 | **D10 LLM provider** | Provider-independent behind an `Extractor` interface, chosen by env vars. Default `LLM_PROVIDER=none` → manual entry. Any extractor failure falls back to manual entry. No paid provider or model is hardcoded. (§4.3) |
 | **D11 Auth** | Opaque, DB-backed sessions in a `__Host-session` cookie (HttpOnly, Secure, SameSite=Lax). The frontend reaches the API through a same-origin Vercel proxy. Unsafe methods require a valid `Origin`. (§7.3) |
 
-**Locked stack:** Python 3.13, FastAPI, Pydantic v2 + pydantic-settings, SQLAlchemy 2.0 (async) + asyncpg, Alembic, PostgreSQL 17, pwdlib[argon2], httpx, structlog, pytest + pytest-cov + httpx + respx, ruff (lint + format), mypy, pre-commit, Docker Compose (local DB), GitHub Actions CI. Frontend: React + TypeScript + Vite, openapi-typescript + openapi-fetch, TanStack Query, React Router.
+**Locked stack:** Python 3.13, FastAPI, Pydantic v2 + pydantic-settings, SQLAlchemy 2.1 (async) + asyncpg, Alembic, PostgreSQL 17, pwdlib[argon2], httpx, structlog, pytest + pytest-cov + httpx + respx, ruff (lint + format), mypy, pre-commit, Docker Compose (local DB), GitHub Actions CI. Frontend: React + TypeScript + Vite, openapi-typescript + openapi-fetch, TanStack Query, React Router.
 
 **Deliberately excluded:** Redis, Celery or any task queue, LangChain or other LLM frameworks, vector databases / RAG, agents, refresh tokens, microservices, vendor LLM SDKs in the core. Each solves a problem this project doesn't have.
 
@@ -516,7 +520,7 @@ Claude implements all components (D8). For every important piece, Claude also ex
 8. Graceful shutdown through the FastAPI lifespan, which disposes of the DB engine.
 9. GitHub Actions CI: ruff, mypy and pytest with coverage against a Postgres service container.
 10. Backend `Dockerfile` (slim image, non-root user, uv for installing, migrations on start).
-11. Check that every dependency installs and runs on Python 3.13 on Windows.
+11. Check that every dependency installs and runs on Python 3.13 in WSL2 Ubuntu.
 12. Side task: sign up for Render, Neon and Vercel. **If any asks for a card, stop** and we pick another option. Optionally look for a no-card free LLM tier; otherwise use `none` in prod and a local model for evals.
 
 Tests for `load_config` and `check_database` are written **first**.
