@@ -1,0 +1,170 @@
+# CI: the same checks as `CLAUDE.md` → Check, plus migrations and integration tests
+# against a real PostgreSQL 17 (DESIGN §7.6, §10.2). CI never calls a real LLM.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read  # least privilege: CI only reads the repo
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true  # a newer push makes the older run pointless
+
+jobs:
+  backend:
+    name: Backend (lint, types, migrations, tests)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: driveradar
+          POSTGRES_PASSWORD: driveradar  # throwaway CI database, not a secret
+          POSTGRES_DB: driveradar
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U driveradar -d driveradar"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      # Dummy values so load_config() passes for Alembic. Tests clear these and set their own.
+      ENVIRONMENT: test
+      DATABASE_URL: postgresql://driveradar:driveradar@localhost:5432/driveradar
+      TEST_DATABASE_URL: postgresql://driveradar:driveradar@localhost:5432/driveradar
+      ALLOWED_ORIGINS: http://localhost:5173
+      BATCH_INVITE_CODE: ci-invite-code
+      CRON_SECRET: ci-cron-secret-not-real
+      UV_PYTHON_DOWNLOADS: automatic
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+        with:
+          version: "0.13.9"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install dependencies (fails if uv.lock is out of date)
+        run: uv sync --locked
+
+      - name: Lint
+        run: uv run ruff check . --output-format=github
+
+      - name: Format
+        run: uv run ruff format --check .
+
+      - name: Type check
+        run: uv run mypy app
+
+      - name: Migrations apply cleanly to an empty database
+        run: |
+          uv run alembic upgrade head
+          uv run alembic downgrade base
+          uv run alembic upgrade head
+
+      - name: Models and migrations are in sync
+        run: uv run alembic check
+
+      - name: Tests (incl. Postgres integration) with coverage
+        run: uv run pytest -q --cov --cov-report=term-missing
+
+  docker:
+    name: Docker image (build + smoke test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: driveradar
+          POSTGRES_PASSWORD: driveradar  # throwaway CI database, not a secret
+          POSTGRES_DB: driveradar
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U driveradar -d driveradar"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Build image
+        run: docker build --tag driveradar-backend:ci backend
+
+      - name: Image runs as a non-root user
+        run: |
+          uid="$(docker run --rm --entrypoint id driveradar-backend:ci -u)"
+          echo "uid=$uid"
+          test "$uid" != "0"
+
+      - name: Start container (applies migrations, then serves)
+        run: |
+          docker run --detach --name api --network host \
+            -e ENVIRONMENT=prod \
+            -e DATABASE_URL=postgresql://driveradar:driveradar@localhost:5432/driveradar \
+            -e ALLOWED_ORIGINS=http://localhost:5173 \
+            -e BATCH_INVITE_CODE=ci-invite-code \
+            -e CRON_SECRET=ci-cron-secret-not-real \
+            -e PORT=8000 \
+            driveradar-backend:ci
+
+      - name: Smoke test /healthz and /readyz
+        run: |
+          for i in $(seq 1 30); do
+            curl --silent --fail http://localhost:8000/healthz && break
+            sleep 1
+          done
+          echo
+          curl --silent --show-error --fail --include http://localhost:8000/healthz
+          echo
+          curl --silent --show-error --fail --include http://localhost:8000/readyz
+          echo
+          # A normal (non-probe) request, logged at INFO, for the log check below.
+          curl --silent --show-error --fail --output /dev/null http://localhost:8000/openapi.json
+
+      - name: Migrations were applied on start
+        run: |
+          docker exec api alembic current | tee /dev/stderr | grep -q "(head)"
+
+      - name: Logs are JSON with request IDs
+        run: |
+          docker logs api 2>&1 | tail -n 20
+          docker logs api 2>&1 | grep '"event": "request"' | head -n 1 | python3 -c \
+            "import json, sys; line = json.loads(sys.stdin.read()); assert line['request_id'], line"
+
+      - name: Container logs (on failure)
+        if: failure()
+        run: docker logs api || true
+
+  pre-commit:
+    name: Pre-commit hooks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+        with:
+          version: "0.13.9"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Run every hook on every file
+        run: uv run --project backend --locked pre-commit run --all-files --show-diff-on-failure

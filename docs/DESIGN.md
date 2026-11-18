@@ -1,11 +1,18 @@
-# DriveRadar — Design Doc (v2.1)
+# DriveRadar — Design Doc (v2.2)
 
-Placement-notice tracker for my college batch, with AI-assisted notice extraction. Portfolio project, ~14 days, ₹0/month.
-Status: **v2.1, decisions locked** (2026-11-18). Change decisions here first, then in code.
+Placement-notice tracker for my college batch, with AI-assisted notice extraction. Portfolio project, 10-day roadmap, ₹0/month.
+Status: **v2.2, decisions locked** (2026-11-18). Change decisions here first, then in code.
 
 ---
 
 ## Changelog
+
+### v2.2 (2026-11-18)
+- **Roadmap:** milestones M0–M9 are replaced by a **10-day roadmap (Day 1–Day 10)** (§10). A "Day" is a unit of work, not a calendar date. It can take several sittings, and the real dates go in PROGRESS.md.
+- **Compression:** drives + eligibility are one day (Day 3), and evals + tracker are one day (Day 5). All major features stay.
+- **Schedule rule:** tests, security, AI evidence validation and the deterministic eligibility boundary are never cut to meet the schedule. If a day slips, Day 10 polish gets cut first.
+- **Docker fallback:** if local Docker can't be fixed in reasonable time, Postgres 17 in GitHub Actions is the verified integration environment, and local development uses the alternative in §10.2.
+- Telegram forward-to-draft stays in the v2 backlog.
 
 ### v2.1 (2026-11-18)
 - **D2:** development runs in **WSL2 Ubuntu**. Windows Smart App Control blocks the unsigned executables and compiled extensions inside native Python venvs, so native Windows Python is unreliable. WSL also matches CI, Docker and Render (all Linux).
@@ -240,7 +247,7 @@ Any non-final state ──→ WITHDRAWN
 - **Alerts:** a new drive is published that the student is eligible for, or a deadline is 24 h away, then 3 h away. Deadline alerts are skipped if the student has already marked APPLIED or WITHDRAWN.
 - **Scheduling on free hosting:** free backends go to sleep, so an in-process scheduler can't be trusted. A **GitHub Actions cron** (every 30 min) calls `POST /internal/run-reminders` with a secret header. Cron runs can be late, so the job selects deadlines **inside a time window** ("due within the next 24 h and not yet sent"), never at an exact time. The same job deletes expired sessions.
 - **No duplicate alerts:** `notifications` has `UNIQUE(student_id, drive_id, kind)`. Insert first, send only if the insert succeeded. A retried cron run never sends the same reminder twice.
-- **Stretch (M9):** the admin forwards a notice to the bot, and the same extraction pipeline (§4) creates a draft in a background task.
+- **v2 (§12):** the admin forwards a notice to the bot, and the same extraction pipeline (§4) creates a draft in a background task.
 
 ## 6. Data model (PostgreSQL)
 
@@ -397,7 +404,7 @@ driveradar/
 │   │   └── scripts/          (export_openapi, seed)
 │   ├── evals/                (golden/, results/, run.py)
 │   └── tests/
-└── frontend/                 (from M6; vercel.json holds the /api rewrite)
+└── frontend/                 (from Day 6; vercel.json holds the /api rewrite)
 ```
 
 ### 7.2 Configuration
@@ -412,7 +419,7 @@ Config comes only from env vars, loaded and validated once at startup by `load_c
 | `BATCH_INVITE_CODE` | yes | |
 | `SESSION_TTL_HOURS` | no (default 168) | |
 | `CRON_SECRET` | yes | Header for `/internal/run-reminders` |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET` | from M7 | |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET` | from Day 8 | |
 | `LLM_PROVIDER` | no (default `none`) | `none` \| `openai_compatible` |
 | `LLM_BASE_URL`, `LLM_MODEL` | if provider ≠ `none` | |
 | `LLM_API_KEY` | optional | Some local servers need none |
@@ -446,7 +453,7 @@ Config comes only from env vars, loaded and validated once at startup by `load_c
 ### 7.6 Quality gates
 
 - **pre-commit:** ruff (lint), ruff-format, trailing whitespace / end-of-file, check-yaml, detect-private-key. mypy runs in CI only, because it's too slow for every commit.
-- **CI (GitHub Actions):** ruff, ruff format --check, mypy (strict on `app/`), pytest with **pytest-cov** against a Postgres 17 service container. Coverage minimum 80% overall, 90% on `services/`. OpenAPI drift check: the exported `openapi.json` must match the committed one. LLM calls are always faked.
+- **CI (GitHub Actions):** ruff, ruff format --check, mypy (strict on `app/`), pytest with **pytest-cov** against a Postgres 17 service container. Coverage minimum 80% overall, 90% on `services/`. OpenAPI drift check: the exported `openapi.json` must match the committed one. LLM calls are always faked. Migrations are checked from an empty database (`upgrade head` → `downgrade base` → `upgrade head`), plus `alembic check` for model/migration drift. A separate job runs every pre-commit hook. Third-party actions are pinned to full commit SHAs (a tag can be moved; a SHA can't), with a read-only token, and Dependabot proposes weekly updates for actions and Python dependencies.
 - **Frontend types:** `uv run python -m app.scripts.export_openapi` writes `openapi.json` without a running server. `openapi-typescript` generates TS types from it, and `openapi-fetch` gives a typed client. An API change that breaks the frontend fails the type check.
 
 ## 8. API (v1)
@@ -480,7 +487,7 @@ POST   /internal/run-reminders   -> cron only (CRON_SECRET header)
 
 ## 9. Who writes what
 
-Claude implements all components (D8). For every important piece, Claude also explains the logic, the alternatives considered, the trade-offs and the tests, and asks "explain it back" questions at the end of each milestone so I can defend it in interviews.
+Claude implements all components (D8). For every important piece, Claude also explains the logic, the alternatives considered, the trade-offs and the tests, and asks "explain it back" questions at the end of each day so I can defend it in interviews.
 
 | Piece | Interview focus |
 |---|---|
@@ -493,22 +500,29 @@ Claude implements all components (D8). For every important piece, Claude also ex
 | Telegram link flow, reminder job | One-time tokens, idempotency via unique constraint |
 | Frontend, CI, Docker, deploy | Typed API contract, same-origin proxy, ₹0 hosting |
 
-## 10. Milestones (~14 days)
+## 10. 10-day roadmap
 
-| M | Days | Build | Done when |
+**Rules**
+- A **Day** is a unit of work, not a calendar date. A day can take several sittings, and PROGRESS.md records the real dates.
+- A day is finished only when **every** "done when" check is verified. Then the next day starts.
+- Never cut to meet the schedule: tests, security, AI evidence validation, the deterministic eligibility boundary. If a day slips, Day 10 polish items get cut first.
+- Each day ends with 3–5 "explain it back" questions and a PROGRESS.md entry.
+- Commit messages stay conventional (`feat:`, `chore:` …) and name the day in the body, e.g. `Day 3`.
+
+| Day | Focus | Build | Done when |
 |---|---|---|---|
-| **M0 Foundation** | 1–2 | See §10.1 | CI green, `/healthz` + `/readyz` work locally and in Docker |
-| M1 Auth + profile | 3–4 | Branches + aliases + seed, invite code, Argon2, sessions, Origin check, login rate limit, profile. **First deploy: Render + Neon** | Register → login → profile works locally and deployed |
-| M2 Drives | 5 | Drives, eligibility rules, branch join table, admin CRUD, manual close vs computed expiry | Admin can create/publish/close a drive |
-| M3 Eligibility | 6 | `check_eligibility` + tests, `GET /drives` with reasons | Feed shows reasons, tests pass |
-| M4 AI extraction | 7–8 | Schema, prompt, `Extractor` + manual/HTTP/fake implementations, normaliser + evidence check, `extraction_runs`, extract endpoint, golden set + eval script | A real notice pre-fills a flagged draft; manual fallback works with `LLM_PROVIDER=none`; first eval results recorded |
-| M5 Tracker | 9 | State machine, applications, events | Illegal move → 409, timeline recorded |
-| M6 Frontend | 10–11 | Vite app, generated types, Vercel `/api` proxy, login/profile/feed/drive/tracker/admin extract-and-review | Usable end-to-end on mobile, deployed on Vercel |
-| M7 Telegram | 12 | httpx client, link flow, webhook secret, new-drive alert | Publishing pings eligible students |
-| M8 Reminders | 13 | Reminder cron (time windows) + idempotency + session cleanup | Running cron twice sends one message |
-| M9 Polish | 14 | Demo data, README (architecture, AI boundary, eval results, trade-offs) + screenshots, demo video. Stretch: forward-to-draft | Repo ready to share |
+| **1** | Foundation | See §10.1 | All §10.1 checks verified: CI green incl. Postgres 17 integration tests; `/healthz` + `/readyz` work against a real DB and in the Docker image |
+| **2** | Auth + profile + first deploy | Branches + aliases + seed, invite code, Argon2, DB sessions, Origin check, login rate limit, profile. **First deploy: Render + Neon** | Register → login → profile works locally and deployed |
+| **3** | Drives + eligibility | Drives, eligibility rules, branch join table, admin CRUD, manual close vs computed expiry; `check_eligibility` + tests; `GET /drives` with reasons | Admin publishes a drive; feed shows eligible/ineligible with reasons |
+| **4** | AI extraction | Schema, prompt, `Extractor` (manual/HTTP/fake), normaliser + evidence check, `extraction_runs`, extract endpoint | A pasted notice gives a flagged draft; manual fallback works with `LLM_PROVIDER=none` |
+| **5** | Evals + tracker | Golden set + `evals.run`; state machine, applications, events | Eval results recorded; illegal move → 409, timeline recorded |
+| **6** | Frontend I | Vite app, generated types, `/api` proxy, login / profile / feed | A student logs in and sees their filtered feed |
+| **7** | Frontend II | Drive page, tracker, admin extract-and-review; deploy on Vercel | Usable end-to-end on mobile, deployed |
+| **8** | Telegram | httpx client, link flow, webhook secret, new-drive alert | Publishing pings eligible students |
+| **9** | Reminders + hardening | Reminder cron (time windows) + idempotency + session cleanup; fix issues found in the deployed app | Running cron twice sends one message |
+| **10** | Polish | Demo data, README (architecture, AI boundary, eval results, trade-offs) + screenshots, demo video | Repo ready to share |
 
-### 10.1 M0 — Foundation (Days 1–2)
+### 10.1 Day 1 — Foundation
 
 1. Repo layout as in §7.1. `uv init` the backend, pin Python 3.13 (`.python-version`).
 2. Tooling: ruff (lint + format), mypy (strict on `app/`), pytest + pytest-cov. Config lives in `pyproject.toml`. Add `.gitignore`, `.gitattributes` (LF endings), `.editorconfig` and `.pre-commit-config.yaml`.
@@ -518,12 +532,26 @@ Claude implements all components (D8). For every important piece, Claude also ex
 6. `/healthz` (process up) and `/readyz`, which uses **`check_database()`**: a `SELECT 1` with a short timeout, returning 503 if the DB can't be reached.
 7. structlog setup + request-ID middleware.
 8. Graceful shutdown through the FastAPI lifespan, which disposes of the DB engine.
-9. GitHub Actions CI: ruff, mypy and pytest with coverage against a Postgres service container.
+9. GitHub Actions CI: ruff, mypy and pytest with coverage against a Postgres 17 service container (integration tests included), plus a Docker image build and `/healthz` smoke test.
 10. Backend `Dockerfile` (slim image, non-root user, uv for installing, migrations on start).
 11. Check that every dependency installs and runs on Python 3.13 in WSL2 Ubuntu.
 12. Side task: sign up for Render, Neon and Vercel. **If any asks for a card, stop** and we pick another option. Optionally look for a no-card free LLM tier; otherwise use `none` in prod and a local model for evals.
 
 Tests for `load_config` and `check_database` are written **first**.
+
+**Required checks before Day 1 is done**
+- ruff, ruff format, mypy strict, pytest with coverage ≥ 80%: green locally (WSL) and in CI.
+- Integration tests (real `SELECT 1`, `alembic upgrade head` from empty) green against Postgres 17.
+- `/healthz` = 200 and `/readyz` = 200 with the DB up, 503 with it down.
+- Every log line is JSON in prod, has a request ID, and the response carries `X-Request-ID`.
+- The Docker image builds, runs as a non-root user, applies migrations on start, and serves `/healthz`.
+
+### 10.2 Docker fallback
+
+Local Docker problems must not block development indefinitely. If Docker Desktop's WSL integration can't be fixed in reasonable time:
+- **Verified integration environment:** GitHub Actions. CI runs the integration tests against a `postgres:17` service container, and builds and smoke-tests the Docker image (start it, call `/healthz`). These CI results count as Day 1's integration and Docker checks.
+- **Local development alternative:** install PostgreSQL 17 directly in WSL Ubuntu from the official PostgreSQL apt repository (apt.postgresql.org). Create the same `driveradar` user and database as `docker-compose.yml`, then point `DATABASE_URL` / `TEST_DATABASE_URL` at it. Unit tests never need a database.
+- `docker-compose.yml` stays the preferred local setup, and we switch back once Docker works.
 
 ## 11. Interview talking points
 
@@ -546,14 +574,14 @@ Tests for `load_config` and `check_database` are written **first**.
 - Company-wise history: past drives, packages, rounds, offers.
 - Email ingestion through a forwarding address.
 - Vendor-specific extractor adapters (e.g. a native SDK) if a budget becomes available. The interface stays the same.
-- Telegram forward-to-draft, if not done as the M9 stretch.
+- Telegram forward-to-draft: forward a notice to the bot to create a draft through the same extraction pipeline.
 - Calendar export (.ics) for deadlines.
 - Placement stats dashboard.
 
 ## 13. Open questions
 
 1. Batch size (for the README).
-2. Exact branch codes and common aliases used by my college (needed by M1 seed / M4 normaliser).
-3. Which no-card free LLM tier, if any, is usable at M4. Fallback: `none` in prod + a local model for evals.
-4. Vercel's external-rewrite timeout vs Render's cold start: check at M6. Mitigation: the frontend shows a "waking server…" state and retries.
+2. Exact branch codes and common aliases used by my college (needed by the Day 2 seed / Day 4 normaliser).
+3. Which no-card free LLM tier, if any, is usable on Day 4. Fallback: `none` in prod + a local model for evals.
+4. Vercel's external-rewrite timeout vs Render's cold start: check on Day 7. Mitigation: the frontend shows a "waking server…" state and retries.
 5. Real notices for the golden set: collect 20–30 and anonymise them before committing.

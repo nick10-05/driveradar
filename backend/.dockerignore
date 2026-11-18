@@ -1,0 +1,21 @@
+# Keep the build context small and secrets out of the image.
+.env
+.env.*
+!.env.example
+.venv/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Not needed at runtime.
+tests/
+evals/
+alembic/README
+Dockerfile
+.dockerignore

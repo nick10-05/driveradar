@@ -44,6 +44,13 @@ select = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]  # assert is how pytest works
+# Generated migrations: the template imports op/sa for every file, even empty ones,
+# and "Revises: " is blank for the first migration.
+"alembic/versions/*" = ["F401", "W291"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+known-third-party = ["alembic"]  # the local alembic/ folder is not our package
 
 # ---------------------------------------------------------------- mypy
 [tool.mypy]
@@ -59,6 +66,8 @@ warn_required_dynamic_aliases = true
 # ---------------------------------------------------------------- pytest
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
+markers = ["db: needs a real Postgres (set TEST_DATABASE_URL)"]
 addopts = "-ra --strict-markers --strict-config"
 xfail_strict = true
 
@@ -66,6 +75,7 @@ xfail_strict = true
 [tool.coverage.run]
 source = ["app"]
 branch = true
+omit = ["app/main.py"]  # import-time entry point only; create_app() is tested directly
 
 [tool.coverage.report]
 fail_under = 80

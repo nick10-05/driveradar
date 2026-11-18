@@ -1,0 +1,20 @@
+# Local development database only. Production uses Neon (see docs/DESIGN.md §7.4).
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: driveradar
+      POSTGRES_PASSWORD: driveradar  # local-only dev credential, never used outside this container
+      POSTGRES_DB: driveradar
+    ports:
+      - "127.0.0.1:5432:5432"  # reachable from this machine only
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U driveradar -d driveradar"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
