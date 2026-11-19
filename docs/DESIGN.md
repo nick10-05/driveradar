@@ -254,7 +254,7 @@ Any non-final state ──→ WITHDRAWN
 ```sql
 users(
   id            uuid PK,
-  email         text UNIQUE NOT NULL,          -- stored lower-cased
+  email         text UNIQUE NOT NULL,          -- stored lower-cased, CHECK (email = lower(email))
   password_hash text NOT NULL,                 -- Argon2 (pwdlib)
   role          text NOT NULL CHECK (role IN ('student','admin')),
   name          text NOT NULL,
@@ -418,6 +418,7 @@ Config comes only from env vars, loaded and validated once at startup by `load_c
 | `ALLOWED_ORIGINS` | yes | Comma-separated, used for Origin validation |
 | `BATCH_INVITE_CODE` | yes | |
 | `SESSION_TTL_HOURS` | no (default 168) | |
+| `SESSION_COOKIE_SECURE` | no (default `true`) | `false` only allowed in `dev`; the cookie is then named `session` instead of `__Host-session` (§7.3) |
 | `CRON_SECRET` | yes | Header for `/internal/run-reminders` |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET` | from Day 8 | |
 | `LLM_PROVIDER` | no (default `none`) | `none` \| `openai_compatible` |
@@ -431,7 +432,7 @@ Config comes only from env vars, loaded and validated once at startup by `load_c
 - **Same-origin proxy:** `*.vercel.app` and `*.onrender.com` are different sites, so a cookie from Render would be a third-party cookie, which Safari and Firefox block by default. A Vercel rewrite sends `/api/:path*` to the Render backend, so the browser only ever talks to the frontend's origin. In local dev, the Vite dev server proxies `/api` the same way. **No CORS configuration is needed.**
 - **Sessions:** on login, generate a 256-bit random token (`secrets.token_urlsafe(32)`), send it in the cookie, and store only its **SHA-256 hash** with an expiry. A fast hash is enough because the token is long and random, unlike a password. Each request looks up the hash. Logout deletes the row, and "log out everywhere" deletes all of a user's rows.
 - **Cookie:** `__Host-session`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, no `Domain`. The `__Host-` prefix makes the browser enforce `Secure`, `Path=/` and no `Domain`. In `ENVIRONMENT=dev` over plain http, the name and `Secure` flag are configurable in case a browser refuses Secure cookies on `localhost`.
-- **CSRF:** `SameSite=Lax` blocks cross-site POST/PUT/PATCH/DELETE. As a second layer, any unsafe method from a cookie-authenticated request must carry an `Origin` header listed in `ALLOWED_ORIGINS`, otherwise 403. GET handlers never change state. The Telegram webhook and cron endpoint aren't cookie-authenticated (they use secret headers), so the Origin rule doesn't apply to them.
+- **CSRF:** `SameSite=Lax` blocks cross-site POST/PUT/PATCH/DELETE. As a second layer, any unsafe method must carry an `Origin` header listed in `ALLOWED_ORIGINS`, otherwise 403. A missing `Origin` is rejected too (fail closed), and login/register are covered (blocks login CSRF). GET handlers never change state. The Telegram webhook and cron endpoint aren't cookie-authenticated (they use secret headers), so the Origin rule doesn't apply to them.
 - **Why not a JWT:** the API serves one first-party frontend on the same origin, so a stateless token adds nothing and makes revocation hard. The cost of DB sessions is one indexed lookup per request.
 
 ### 7.4 Database connection (Neon + asyncpg)
@@ -446,7 +447,7 @@ Config comes only from env vars, loaded and validated once at startup by `load_c
 
 - **Logging:** structlog. JSON in prod, readable console output in dev. Passwords, cookies, tokens, API keys and `Authorization` headers are redacted. Raw notice text isn't logged at INFO.
 - **Request IDs:** middleware accepts an incoming `X-Request-ID` (if it's well-formed) or generates one, binds it to every log line through contextvars, and returns it in the response.
-- **Rate limiting:** a small in-memory sliding-window limiter. Login: ~5 attempts per 15 min per email, plus a looser per-IP limit. Extraction: per-admin limit. The client IP comes from `X-Forwarded-For` behind the proxies, which can be faked, so email is the primary key. **Known limitation:** state is per process and resets on restart. That's acceptable for one Render instance. Redis would be the fix at scale.
+- **Rate limiting:** a small in-memory sliding-window limiter. Login: 5 failed attempts per 15 min per email, plus 30 per 15 min per IP. Register: 10 wrong invite codes per hour per IP. Attempts are counted before the password check (parallel requests can't slip through) and successes are un-counted (a class sharing one Wi-Fi IP isn't blocked). Extraction: per-admin limit. The client IP comes from `X-Forwarded-For` behind the proxies, which can be faked, so email is the primary key. **Known limitation:** state is per process and resets on restart. That's acceptable for one Render instance. Redis would be the fix at scale.
 - **Graceful shutdown:** the FastAPI lifespan closes the httpx clients and disposes of the DB engine.
 - **Health vs readiness:** `/healthz` = the process is up (no DB call). `/readyz` = the DB is reachable, otherwise 503.
 

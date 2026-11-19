@@ -1,0 +1,39 @@
+# Render Blueprint: the backend's deploy config, kept in the repo (DESIGN §7, Day 2).
+# Render reads this file when you create a Blueprint from the GitHub repo.
+#
+# Interview notes:
+# - Infrastructure as code: the service settings live in Git and are reviewed like code,
+#   instead of being clicks nobody remembers in a dashboard.
+# - Secrets are never in this file. `sync: false` means "ask for the value in the Render
+#   dashboard"; `generateValue` makes Render create a random one.
+# - Deploys wait for GitHub checks (CI) to pass, so a red commit never reaches production.
+# - Free plan: the service sleeps after ~15 min idle and takes up to a minute to wake.
+services:
+  - type: web
+    name: driveradar-api
+    runtime: docker
+    plan: free
+    region: singapore  # closest Render region to India; create the Neon DB in Singapore too
+    dockerContext: ./backend
+    dockerfilePath: ./backend/Dockerfile
+    healthCheckPath: /healthz  # liveness only: a DB blip must not restart the app
+    autoDeployTrigger: checksPass
+    buildFilter:
+      paths:
+        - backend/**
+        - render.yaml
+    envVars:
+      - key: ENVIRONMENT
+        value: prod
+      - key: DATABASE_URL
+        sync: false  # Neon *direct* (non-pooler) connection string, pasted as-is
+      - key: ALLOWED_ORIGINS
+        sync: false  # until Day 7: http://localhost:5173 ; then the Vercel URL
+      - key: BATCH_INVITE_CODE
+        sync: false  # share with the batch only
+      - key: CRON_SECRET
+        generateValue: true
+      - key: LOG_LEVEL
+        value: INFO
+      - key: LLM_PROVIDER
+        value: none

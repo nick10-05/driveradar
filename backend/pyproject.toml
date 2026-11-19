@@ -49,7 +49,7 @@ select = [
 "alembic/versions/*" = ["F401", "W291"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["app"]
+known-first-party = ["app", "tests"]
 known-third-party = ["alembic"]  # the local alembic/ folder is not our package
 
 # ---------------------------------------------------------------- mypy
@@ -75,6 +75,9 @@ xfail_strict = true
 [tool.coverage.run]
 source = ["app"]
 branch = true
+# SQLAlchemy's async layer runs DB calls in greenlets; without this, coverage loses track
+# after an `await session...` and reports lines that did run as missed.
+concurrency = ["greenlet", "thread"]
 omit = ["app/main.py"]  # import-time entry point only; create_app() is tested directly
 
 [tool.coverage.report]

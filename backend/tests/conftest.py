@@ -4,11 +4,25 @@ Tests never read the developer's real environment or `.env`: `clean_env` removes
 config variable first, and `load_config(env_file=None)` skips the `.env` file.
 """
 
-from collections.abc import Iterator
+import os
+from collections.abc import AsyncIterator, Iterator
+from contextlib import asynccontextmanager
+from pathlib import Path
 
+import httpx
 import pytest
+from alembic import command
+from alembic.config import Config
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_session
 from app.core.config import Settings, load_config
+from app.core.db import create_engine
+from app.core.rate_limit import AuthLimiters
+from app.factory import create_app
+from tests.helpers import with_database_url
+
+ALEMBIC_INI = Path(__file__).resolve().parent.parent / "alembic.ini"
 
 VALID_ENV: dict[str, str] = {
     "ENVIRONMENT": "test",
@@ -46,3 +60,83 @@ def valid_env(clean_env: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
 @pytest.fixture
 def settings(valid_env: pytest.MonkeyPatch) -> Settings:
     return load_config(env_file=None)
+
+
+# ---------------------------------------------------------------- real Postgres
+#
+# Integration tests run against TEST_DATABASE_URL (CI's Postgres 17 service, or the local
+# Docker one) and are skipped when it isn't set. Isolation: each test runs inside one
+# transaction that is rolled back at the end, so tests never see each other's rows and the
+# seed data from the migrations stays untouched.
+
+
+@pytest.fixture(scope="session")
+def test_database_url() -> str:
+    """Migrate the test database to head once per test run, then return its URL."""
+    url = os.environ.get("TEST_DATABASE_URL")
+    if not url:
+        pytest.skip("needs a real Postgres (set TEST_DATABASE_URL)")
+    with pytest.MonkeyPatch.context() as mp:
+        # alembic/env.py reads its config from env vars, like the app does.
+        for key, value in {**VALID_ENV, "DATABASE_URL": url}.items():
+            mp.setenv(key, value)
+        command.upgrade(Config(str(ALEMBIC_INI)), "head")
+    return url
+
+
+@pytest.fixture
+async def db_session(test_database_url: str, settings: Settings) -> AsyncIterator[AsyncSession]:
+    """A session inside a transaction that is always rolled back.
+
+    join_transaction_mode="create_savepoint": if code under test calls commit() or
+    rollback(), it only affects a SAVEPOINT, never the outer transaction we roll back.
+    """
+    engine = create_engine(with_database_url(settings, test_database_url))
+    try:
+        async with engine.connect() as connection:
+            transaction = await connection.begin()
+            session = AsyncSession(
+                bind=connection, expire_on_commit=False, join_transaction_mode="create_savepoint"
+            )
+            try:
+                yield session
+            finally:
+                await session.close()
+                await transaction.rollback()
+    finally:
+        await engine.dispose()
+
+
+@pytest.fixture
+async def api(settings: Settings, db_session: AsyncSession) -> AsyncIterator[httpx.AsyncClient]:
+    """An HTTP client for the app whose requests all use `db_session`.
+
+    httpx's ASGITransport runs the app in the test's own event loop (TestClient uses a
+    separate thread and loop, and an asyncpg connection can't be shared across loops).
+    The lifespan isn't run, so no app engine is created: every DB call goes through the
+    overridden get_session. https, because the cookie jar (like a browser) never sends a
+    Secure cookie over plain http.
+    """
+    async with api_client(settings, db_session) as client:
+        yield client
+
+
+@asynccontextmanager
+async def api_client(
+    settings: Settings, db_session: AsyncSession, limiters: AuthLimiters | None = None
+) -> AsyncIterator[httpx.AsyncClient]:
+    """Like the `api` fixture, for tests that need different settings or limits.
+
+    Sends the frontend's Origin on every request, like a browser on our site would.
+    """
+    app = create_app(settings)
+    app.dependency_overrides[get_session] = lambda: db_session
+    if limiters is not None:
+        app.state.auth_limiters = limiters
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(
+        transport=transport,
+        base_url="https://test",
+        headers={"Origin": settings.allowed_origins[0]},
+    ) as client:
+        yield client

@@ -75,6 +75,34 @@ class TestLoadConfig:
             load_config(env_file=None)
 
 
+class TestSessionCookie:
+    def test_secure_host_cookie_by_default(self, valid_env: pytest.MonkeyPatch) -> None:
+        settings = load_config(env_file=None)
+
+        assert settings.session_cookie_secure is True
+        assert settings.session_cookie_name == "__Host-session"
+
+    def test_insecure_cookie_allowed_in_dev_with_plain_name(
+        self, valid_env: pytest.MonkeyPatch
+    ) -> None:
+        valid_env.setenv("ENVIRONMENT", "dev")
+        valid_env.setenv("SESSION_COOKIE_SECURE", "false")
+
+        settings = load_config(env_file=None)
+
+        assert settings.session_cookie_name == "session"  # "__Host-" requires Secure
+
+    @pytest.mark.parametrize("environment", ["test", "prod"])
+    def test_insecure_cookie_rejected_outside_dev(
+        self, valid_env: pytest.MonkeyPatch, environment: str
+    ) -> None:
+        valid_env.setenv("ENVIRONMENT", environment)
+        valid_env.setenv("SESSION_COOKIE_SECURE", "false")
+
+        with pytest.raises(ConfigError, match="SESSION_COOKIE_SECURE"):
+            load_config(env_file=None)
+
+
 class TestAllowedOrigins:
     def test_comma_separated_list_is_split_and_trimmed(self, valid_env: pytest.MonkeyPatch) -> None:
         valid_env.setenv(

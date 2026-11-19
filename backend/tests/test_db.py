@@ -4,17 +4,12 @@ import os
 import time
 
 import pytest
-from pydantic import SecretStr
 
-from app.core.config import Settings, normalize_database_url
+from app.core.config import Settings
 from app.core.db import check_database, create_engine
+from tests.helpers import with_database_url
 
 pytestmark = pytest.mark.anyio
-
-
-def with_database_url(settings: Settings, raw_url: str) -> Settings:
-    url, ssl = normalize_database_url(raw_url)
-    return settings.model_copy(update={"database_url": SecretStr(url), "database_ssl": ssl})
 
 
 async def test_unreachable_database_returns_false(settings: Settings) -> None:

@@ -86,6 +86,8 @@ class Settings(BaseSettings):
     batch_invite_code: SecretStr = Field(min_length=8)
     cron_secret: SecretStr = Field(min_length=16)
     session_ttl_hours: int = Field(default=168, gt=0)
+    # Only for browsers that refuse Secure cookies on http://localhost (e.g. Safari). Dev only.
+    session_cookie_secure: bool = True
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
     telegram_bot_token: SecretStr | None = None
@@ -133,6 +135,18 @@ class Settings(BaseSettings):
             if parts.scheme not in {"http", "https"} or not parts.netloc or parts.path:
                 raise ValueError(f"{origin!r} must be scheme://host[:port] with no path")
         return origins
+
+    @property
+    def session_cookie_name(self) -> str:
+        # Browsers only accept a "__Host-" cookie if it is Secure, has Path=/ and no Domain,
+        # so the prefix itself guarantees those flags. Without Secure, a plain name is needed.
+        return "__Host-session" if self.session_cookie_secure else "session"
+
+    @model_validator(mode="after")
+    def _insecure_cookie_only_in_dev(self) -> Self:
+        if not self.session_cookie_secure and self.environment != "dev":
+            raise ValueError("SESSION_COOKIE_SECURE=false is only allowed when ENVIRONMENT=dev")
+        return self
 
     @model_validator(mode="after")
     def _llm_provider_needs_endpoint(self) -> Self:
