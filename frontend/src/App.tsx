@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from "react-router";
 import { AdminDrivePage, AdminDrivesPage, NewDrivePage, RequireAdmin } from "./admin/AdminPages";
 import { RequireAuth } from "./auth/RequireAuth";
 import { Layout } from "./components/Layout";
+import { WakingBanner } from "./components/WakingBanner";
 import { DrivePage } from "./pages/DrivePage";
 import { FeedPage } from "./pages/FeedPage";
 import { LoginPage } from "./pages/LoginPage";
@@ -12,7 +13,10 @@ import { TrackerPage } from "./pages/TrackerPage";
 
 export function App() {
   return (
-    <Routes>
+    <>
+      {/* Above the routes, so it also shows on the login page. */}
+      <WakingBanner />
+      <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route
@@ -31,6 +35,7 @@ export function App() {
         <Route path="admin/drives/:id" element={<RequireAdmin><AdminDrivePage /></RequireAdmin>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </>
   );
 }

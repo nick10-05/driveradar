@@ -10,7 +10,7 @@
  */
 import { QueryCache, QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { api, isApiError, unwrap, type Schemas } from "./client";
+import { api, isApiError, isWakingUp, unwrap, type Schemas } from "./client";
 
 // Keys are prefixes: invalidating ["drives"] also refreshes every ["drives", id].
 export const keys = {
@@ -23,7 +23,27 @@ export const keys = {
   adminDrive: (id: string) => ["admin", "drives", id] as const,
 };
 
-export function createQueryClient(): QueryClient {
+/**
+ * When a failed query is tried again:
+ * - 4xx: never (can't help, and would re-hit rate limits).
+ * - 502/503/504: the free-tier backend is waking up; keep trying for about a minute.
+ * - anything else (other 5xx, network down): once.
+ * Only queries (GETs) retry. Mutations never do: resending a POST/PUT on our own could
+ * apply it twice; the user sees the "waking up" message and presses the button again.
+ */
+export function shouldRetry(failureCount: number, error: unknown): boolean {
+  if (isApiError(error) && error.status < 500) return false;
+  return failureCount < (isWakingUp(error) ? WAKING_RETRIES : 1);
+}
+
+const WAKING_RETRIES = 10;
+
+/** 1 s, 2 s, 4 s, then every 8 s: ~10 tries over ~60 s, Render wakes in ~30 s. */
+export function retryDelay(failureCount: number): number {
+  return Math.min(1000 * 2 ** failureCount, 8000);
+}
+
+export function createQueryClient(options: { retryDelay?: (failureCount: number) => number } = {}): QueryClient {
   const client: QueryClient = new QueryClient({
     queryCache: new QueryCache({
       // Session expired mid-use (any query got 401): drop the cached user, and
@@ -35,8 +55,8 @@ export function createQueryClient(): QueryClient {
     defaultOptions: {
       queries: {
         staleTime: 30_000,
-        // Retrying a 4xx can't help (and would re-hit rate limits); retry network/5xx once.
-        retry: (count, error) => !(isApiError(error) && error.status < 500) && count < 1,
+        retry: shouldRetry,
+        retryDelay: options.retryDelay ?? retryDelay,
       },
       mutations: { retry: false },
     },

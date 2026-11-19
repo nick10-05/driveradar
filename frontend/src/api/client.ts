@@ -38,6 +38,19 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Render's free tier sleeps after ~15 idle minutes and takes ~30 s to wake. Meanwhile the
+ * Vercel proxy answers 502 (sometimes 503/504) at once. These statuses mean "try again
+ * soon", not "broken", so queries retry them for about a minute (queries.ts).
+ */
+const WAKING_STATUSES: ReadonlySet<number> = new Set([502, 503, 504]);
+export const WAKING_MESSAGE =
+  "The server is waking up (free hosting, up to a minute). Try again in a few seconds.";
+
+export function isWakingUp(error: unknown): boolean {
+  return error instanceof ApiError && WAKING_STATUSES.has(error.status);
+}
+
 type ValidationItem = { loc?: (string | number)[]; msg?: string };
 
 /** FastAPI errors: `{"detail": "text"}` or, for 422, `{"detail": [{loc, msg}, ...]}`. */
@@ -53,6 +66,7 @@ export function errorMessage(status: number, body: unknown): string {
       .join("; ");
   }
   if (status === 429) return "Too many attempts. Try again later.";
+  if (WAKING_STATUSES.has(status)) return WAKING_MESSAGE;
   if (status >= 500) return "The server had a problem. Try again in a minute.";
   return `Request failed (${status})`;
 }

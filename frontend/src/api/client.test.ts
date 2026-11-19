@@ -24,7 +24,8 @@ describe("errorMessage", () => {
 
   it("falls back to a friendly message by status", () => {
     expect(errorMessage(429, null)).toMatch(/Too many attempts/);
-    expect(errorMessage(502, "<html>Bad gateway</html>")).toMatch(/server had a problem/);
+    expect(errorMessage(500, "<html>Internal error</html>")).toMatch(/server had a problem/);
+    expect(errorMessage(502, "<html>Bad gateway</html>")).toMatch(/waking up/); // cold start
     expect(errorMessage(418, {})).toBe("Request failed (418)");
   });
 });

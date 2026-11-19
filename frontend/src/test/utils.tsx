@@ -44,8 +44,8 @@ function LocationProbe() {
 }
 
 /** Render the whole app at `path`, with a fresh cache (no state leaks between tests). */
-export function renderApp(path = "/") {
-  const queryClient = createQueryClient();
+export function renderApp(path = "/", options: Parameters<typeof createQueryClient>[0] = {}) {
+  const queryClient = createQueryClient(options);
   const result = render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[path]}>
