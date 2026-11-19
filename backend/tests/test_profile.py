@@ -20,7 +20,8 @@ async def test_me_has_no_profile_until_one_is_saved(api: httpx.AsyncClient) -> N
     body = (await api.get("/me")).json()
 
     assert body["profile"] is None
-    assert set(body) == {"id", "email", "name", "role", "profile"}
+    assert set(body) == {"id", "email", "name", "role", "profile", "telegram_available"}
+    assert body["telegram_available"] is False  # no bot configured in tests
 
 
 async def test_save_profile_then_read_it_back(api: httpx.AsyncClient) -> None:

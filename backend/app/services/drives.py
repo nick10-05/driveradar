@@ -188,7 +188,11 @@ async def create_drive(session: AsyncSession, data: DriveCreate, created_by: uui
     return await get_drive(session, drive.id, include_drafts=True)
 
 
-async def update_drive(session: AsyncSession, drive_id: uuid.UUID, data: DriveUpdate) -> Drive:
+async def update_drive(
+    session: AsyncSession, drive_id: uuid.UUID, data: DriveUpdate
+) -> tuple[Drive, bool]:
+    """Returns (drive, published_now). published_now is True only for the draft → published
+    change, so editing an already-published drive never re-triggers new-drive alerts."""
     drive = await get_drive(session, drive_id, include_drafts=True)
     now = datetime.now(UTC)
 
@@ -209,6 +213,7 @@ async def update_drive(session: AsyncSession, drive_id: uuid.UUID, data: DriveUp
         _set_rules(drive, data.eligibility)
     for name, value in _column_values(data, only_sent=True).items():
         setattr(drive, name, value)
+    published_now = drive.status == "draft" and new_status == "published"
     if new_status != drive.status:
         drive.status = new_status
         if new_status == "closed":
@@ -216,4 +221,4 @@ async def update_drive(session: AsyncSession, drive_id: uuid.UUID, data: DriveUp
 
     await session.commit()
     log.info("drive_updated", drive_id=str(drive.id), status=drive.status)
-    return await get_drive(session, drive.id, include_drafts=True)
+    return await get_drive(session, drive.id, include_drafts=True), published_now

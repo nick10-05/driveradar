@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import FastAPI
 
-from app.api import admin_drives, auth, branches, drives, health, me
+from app.api import admin_drives, auth, branches, drives, health, me, telegram
 from app.core.config import Settings
 from app.core.db import create_engine, create_sessionmaker
 from app.core.errors import register_error_handlers
@@ -59,4 +59,5 @@ def create_app(settings: Settings) -> FastAPI:
     app.include_router(branches.router)
     app.include_router(drives.router)
     app.include_router(admin_drives.router)
+    app.include_router(telegram.router)
     return app

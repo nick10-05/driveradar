@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 
 import type { Schemas } from "../api/client";
 import { describeError, useBranches, useMe, useSaveProfile } from "../api/queries";
+import { TelegramCard } from "../components/TelegramCard";
 
 type Profile = Schemas["ProfileOut"];
 
@@ -13,7 +14,15 @@ export function ProfilePage() {
   // remount that happens when the refetched profile arrives.
   const save = useSaveProfile();
   // Remount the form when the saved profile changes, so it starts from the new values.
-  return <ProfileForm key={JSON.stringify(profile)} profile={profile} save={save} />;
+  // Not on telegram_linked: connecting Telegram must not wipe half-typed edits.
+  const formKey = JSON.stringify(profile && { ...profile, telegram_linked: undefined });
+  return (
+    <>
+      <ProfileForm key={formKey} profile={profile} save={save} />
+      {/* Alerts depend on eligibility, so they need a saved profile first. */}
+      {profile && me.data?.telegram_available && <TelegramCard linked={profile.telegram_linked} />}
+    </>
+  );
 }
 
 /** Form fields are strings (what inputs hold); converted to numbers only on submit. */

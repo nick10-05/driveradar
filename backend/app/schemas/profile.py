@@ -9,6 +9,7 @@ Interview notes:
 """
 
 import uuid
+from datetime import datetime
 from decimal import Decimal
 from typing import Annotated
 
@@ -61,3 +62,11 @@ class MeOut(BaseModel):
     name: str
     role: str
     profile: ProfileOut | None
+    telegram_available: bool  # false when the server has no bot configured: hide "Connect"
+
+
+class TelegramLinkOut(BaseModel):
+    """POST /me/telegram-link. Open `url` in Telegram and press Start within 15 minutes."""
+
+    url: str
+    expires_at: datetime

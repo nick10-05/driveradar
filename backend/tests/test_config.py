@@ -1,5 +1,7 @@
 """load_config(): read env vars, validate them, fail fast with a clear message."""
 
+from typing import ClassVar
+
 import pytest
 
 from app.core.config import ConfigError, load_config, normalize_database_url
@@ -215,3 +217,56 @@ class TestNormalizeDatabaseUrl:
         assert settings.database_url.get_secret_value() == "postgresql+asyncpg://u:p@h.neon.tech/db"
         assert settings.database_ssl is True
         assert "u:p@" not in repr(settings)  # the URL contains a password
+
+
+class TestTelegramConfig:
+    TELEGRAM: ClassVar[dict[str, str]] = {
+        "TELEGRAM_BOT_TOKEN": "123456:fake-token",
+        "TELEGRAM_WEBHOOK_SECRET": "webhook-secret-0123456789",
+        "TELEGRAM_BOT_USERNAME": "DriveRadarBot",
+    }
+
+    def test_off_by_default(self, valid_env: pytest.MonkeyPatch) -> None:
+        settings = load_config(env_file=None)
+
+        assert settings.telegram_enabled is False
+
+    def test_all_three_turn_it_on(self, valid_env: pytest.MonkeyPatch) -> None:
+        for key, value in self.TELEGRAM.items():
+            valid_env.setenv(key, value)
+
+        settings = load_config(env_file=None)
+
+        assert settings.telegram_enabled is True
+        assert "fake-token" not in repr(settings)  # SecretStr
+
+    @pytest.mark.parametrize("missing", list(TELEGRAM))
+    def test_partial_config_fails(self, valid_env: pytest.MonkeyPatch, missing: str) -> None:
+        for key, value in self.TELEGRAM.items():
+            if key != missing:
+                valid_env.setenv(key, value)
+
+        with pytest.raises(ConfigError, match="must be set together"):
+            load_config(env_file=None)
+
+    @pytest.mark.parametrize("secret", ["short", "has spaces in it!!", "x" * 257])
+    def test_webhook_secret_must_be_telegram_safe(
+        self, valid_env: pytest.MonkeyPatch, secret: str
+    ) -> None:
+        for key, value in self.TELEGRAM.items():
+            valid_env.setenv(key, value)
+        valid_env.setenv("TELEGRAM_WEBHOOK_SECRET", secret)
+
+        with pytest.raises(ConfigError) as exc_info:
+            load_config(env_file=None)
+
+        assert "TELEGRAM_WEBHOOK_SECRET" in str(exc_info.value)
+        assert secret not in str(exc_info.value)  # never echo a secret
+
+    def test_bot_username_is_validated(self, valid_env: pytest.MonkeyPatch) -> None:
+        for key, value in self.TELEGRAM.items():
+            valid_env.setenv(key, value)
+        valid_env.setenv("TELEGRAM_BOT_USERNAME", "@bad name")
+
+        with pytest.raises(ConfigError, match="TELEGRAM_BOT_USERNAME"):
+            load_config(env_file=None)

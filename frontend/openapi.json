@@ -260,6 +260,53 @@
         }
       }
     },
+    "/me/telegram-link": {
+      "post": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Post Telegram Link",
+        "description": "A one-time deep link (15 minutes) that connects this account to a Telegram chat.",
+        "operationId": "post_telegram_link_me_telegram_link_post",
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramLinkOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not logged in"
+          },
+          "404": {
+            "description": "Telegram isn't set up on this server"
+          },
+          "409": {
+            "description": "Save a profile first"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Delete Telegram Link",
+        "description": "Disconnect Telegram (no more alerts). Safe to call when not connected.",
+        "operationId": "delete_telegram_link_me_telegram_link_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "description": "Not logged in"
+          }
+        }
+      }
+    },
     "/branches": {
       "get": {
         "tags": [
@@ -616,7 +663,7 @@
           "admin"
         ],
         "summary": "Patch",
-        "description": "Edit fields, publish ({\"status\": \"published\"}) or close ({\"status\": \"closed\"}).",
+        "description": "Edit fields, publish ({\"status\": \"published\"}) or close ({\"status\": \"closed\"}).\n\nPublishing also sends a Telegram alert to every eligible student who linked Telegram.",
         "operationId": "patch_admin_drives__drive_id__patch",
         "parameters": [
           {
@@ -1727,6 +1774,10 @@
                 "type": "null"
               }
             ]
+          },
+          "telegram_available": {
+            "type": "boolean",
+            "title": "Telegram Available"
           }
         },
         "type": "object",
@@ -1735,7 +1786,8 @@
           "email",
           "name",
           "role",
-          "profile"
+          "profile",
+          "telegram_available"
         ],
         "title": "MeOut",
         "description": "GET /me. `profile` is null until the student saves one (the feed stays locked)."
@@ -2101,6 +2153,26 @@
         ],
         "title": "StudentDriveOut",
         "description": "A feed entry: the drive plus this student's eligibility result."
+      },
+      "TelegramLinkOut": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "expires_at"
+        ],
+        "title": "TelegramLinkOut",
+        "description": "POST /me/telegram-link. Open `url` in Telegram and press Start within 15 minutes."
       },
       "TrackedDriveOut": {
         "properties": {

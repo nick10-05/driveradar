@@ -7,6 +7,8 @@ Interview notes:
   which is the human approval step the AI boundary (D9) relies on from Day 4.
 - Errors map to clear statuses: 404 unknown drive, 409 illegal status change or edit to a
   closed drive, 422 bad input (past deadline on publish, unknown branch codes).
+- Publishing (draft → published) queues new-drive Telegram alerts as a background task:
+  the admin gets the response at once, the alerts go out right after (services/alerts.py).
 - /extract only returns a draft for the review form; the AI never creates or publishes
   a drive (D9). It is capped per admin (30/hour) to protect a free-tier LLM quota.
 """
@@ -15,7 +17,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
 from app.api.auth import too_many_attempts
 from app.api.deps import (
@@ -24,10 +26,13 @@ from app.api.deps import (
     CurrentAdmin,
     DbSession,
     ExtractionLimiter,
+    SessionFactoryDep,
+    Telegram,
     current_admin,
 )
 from app.api.drive_views import admin_view
 from app.schemas.drive import AdminDriveOut, DriveCreate, DriveUpdate
+from app.services.alerts import send_new_drive_alerts
 from app.services.drives import (
     DriveNotFoundError,
     DriveStateError,
@@ -137,10 +142,21 @@ async def get_one(drive_id: uuid.UUID, session: DbSession) -> AdminDriveOut:
         status.HTTP_409_CONFLICT: {"description": "Illegal status change or drive is closed"},
     },
 )
-async def patch(drive_id: uuid.UUID, data: DriveUpdate, session: DbSession) -> AdminDriveOut:
-    """Edit fields, publish ({"status": "published"}) or close ({"status": "closed"})."""
+async def patch(
+    drive_id: uuid.UUID,
+    data: DriveUpdate,
+    session: DbSession,
+    settings: AppSettings,
+    telegram: Telegram,
+    session_factory: SessionFactoryDep,
+    background: BackgroundTasks,
+) -> AdminDriveOut:
+    """Edit fields, publish ({"status": "published"}) or close ({"status": "closed"}).
+
+    Publishing also sends a Telegram alert to every eligible student who linked Telegram.
+    """
     try:
-        drive = await update_drive(session, drive_id, data)
+        drive, published_now = await update_drive(session, drive_id, data)
     except DriveNotFoundError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Drive not found") from None
     except DriveStateError as exc:
@@ -151,4 +167,8 @@ async def patch(drive_id: uuid.UUID, data: DriveUpdate, session: DbSession) -> A
         ) from None
     except UnknownBranchesError as exc:
         raise _unknown_branches(exc) from None
+    if published_now and telegram is not None:
+        background.add_task(
+            send_new_drive_alerts, session_factory, telegram, drive.id, settings.app_base_url
+        )
     return admin_view(drive, datetime.now(UTC))

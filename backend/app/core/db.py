@@ -9,6 +9,8 @@ Interview notes:
 
 import asyncio
 import ssl
+from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager
 
 import structlog
 from sqlalchemy import text
@@ -19,6 +21,11 @@ from sqlalchemy.ext.asyncio import create_async_engine as _create_async_engine
 from app.core.config import Settings
 
 log = structlog.get_logger(__name__)
+
+
+# Something that opens a new DB session: `async with factory() as session: ...`.
+# An async_sessionmaker is one; tests pass one that hands out their rolled-back session.
+SessionFactory = Callable[[], AbstractAsyncContextManager[AsyncSession]]
 
 
 def create_engine(settings: Settings) -> AsyncEngine:

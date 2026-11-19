@@ -15,6 +15,22 @@ INVITE_CODE = "invite-code-123"  # the test environment's BATCH_INVITE_CODE
 PASSWORD = "correct horse battery"  # noqa: S105 - fake test value
 
 
+BOT_TOKEN = "123456:fake-bot-token-for-tests"  # noqa: S105 - fake test value
+WEBHOOK_SECRET = "webhook-secret-0123456789"  # noqa: S105 - fake test value
+BOT_USERNAME = "DriveRadarTestBot"
+
+
+def with_telegram(settings: Settings) -> Settings:
+    """A copy of settings with a (fake) Telegram bot configured."""
+    return settings.model_copy(
+        update={
+            "telegram_bot_token": SecretStr(BOT_TOKEN),
+            "telegram_webhook_secret": SecretStr(WEBHOOK_SECRET),
+            "telegram_bot_username": BOT_USERNAME,
+        }
+    )
+
+
 def with_database_url(settings: Settings, raw_url: str) -> Settings:
     """A copy of settings pointing at another database (same normalisation as load_config)."""
     url, ssl = normalize_database_url(raw_url)

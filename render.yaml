@@ -37,3 +37,12 @@ services:
         value: INFO
       - key: LLM_PROVIDER
         value: none
+      # Telegram (Day 8): all three or none. Empty = alerts off; the app still starts.
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false  # from @BotFather
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false  # e.g. `openssl rand -hex 32` (not generateValue: a secret without a token would stop startup)
+      - key: TELEGRAM_BOT_USERNAME
+        sync: false  # without the @
+      - key: APP_BASE_URL
+        sync: false  # the Vercel URL, for links in alerts

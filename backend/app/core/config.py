@@ -7,6 +7,7 @@ Interview notes:
   '**********' in logs, reprs and tracebacks. Error messages never echo input values.
 """
 
+import re
 from contextlib import suppress
 from typing import Annotated, Any, Literal, Self
 from urllib.parse import urlsplit
@@ -109,8 +110,31 @@ class Settings(LlmSettings):
     session_cookie_secure: bool = True
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
+    # Telegram (Day 8): all three or none. None = Telegram off (no links, no alerts).
     telegram_bot_token: SecretStr | None = None
+    # Telegram echoes it in X-Telegram-Bot-Api-Secret-Token; it allows only these chars.
     telegram_webhook_secret: SecretStr | None = None
+    telegram_bot_username: Annotated[str, Field(pattern=r"^[A-Za-z0-9_]{5,32}$")] | None = None
+    # Public frontend URL, for links inside Telegram messages. Optional.
+    app_base_url: HttpUrl | None = None
+
+    @property
+    def telegram_enabled(self) -> bool:
+        return self.telegram_bot_token is not None
+
+    @model_validator(mode="after")
+    def _telegram_all_or_nothing(self) -> Self:
+        values = (self.telegram_bot_token, self.telegram_webhook_secret, self.telegram_bot_username)
+        if any(v is not None for v in values) and not all(v is not None for v in values):
+            raise ValueError(
+                "TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET and TELEGRAM_BOT_USERNAME "
+                "must be set together (or all left empty)"
+            )
+        if self.telegram_webhook_secret is not None and not re.fullmatch(
+            r"[A-Za-z0-9_-]{16,256}", self.telegram_webhook_secret.get_secret_value()
+        ):
+            raise ValueError("TELEGRAM_WEBHOOK_SECRET must be 16-256 characters of A-Z a-z 0-9 _ -")
+        return self
 
     @model_validator(mode="before")
     @classmethod

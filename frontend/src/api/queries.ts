@@ -64,10 +64,14 @@ export function createQueryClient(options: { retryDelay?: (failureCount: number)
   return client;
 }
 
-/** The logged-in user, `null` when logged out (401 is an answer here, not an error). */
-export function useMe() {
+/**
+ * The logged-in user, `null` when logged out (401 is an answer here, not an error).
+ * `refetchInterval`: poll while waiting for something that happens elsewhere (Telegram).
+ */
+export function useMe(options: { refetchInterval?: number | false } = {}) {
   return useQuery({
     queryKey: keys.me,
+    refetchInterval: options.refetchInterval ?? false,
     queryFn: async (): Promise<Schemas["MeOut"] | null> => {
       try {
         return await unwrap(api.GET("/me"));
@@ -137,6 +141,19 @@ export function useSaveProfile() {
         queryClient.invalidateQueries({ queryKey: keys.drives }),
       ]);
     },
+  });
+}
+
+/** A one-time t.me deep link (15 minutes). The chat is linked when the student presses Start. */
+export function useTelegramLink() {
+  return useMutation({ mutationFn: () => unwrap(api.POST("/me/telegram-link")) });
+}
+
+export function useDisconnectTelegram() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => unwrap(api.DELETE("/me/telegram-link")),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.me }),
   });
 }
 

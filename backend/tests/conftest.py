@@ -15,13 +15,21 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_extractor, get_session
+from app.api.deps import get_extractor, get_session, get_session_factory, get_telegram
 from app.core.config import Settings, load_config
 from app.core.db import create_engine
 from app.core.rate_limit import AuthLimiters, SlidingWindowLimiter
 from app.factory import create_app
 from app.services.extraction.extractors import Extractor
-from tests.helpers import INVITE_CODE, profile, sign_in, sign_in_as_admin, with_database_url
+from app.services.telegram import TelegramClient
+from tests.helpers import (
+    INVITE_CODE,
+    profile,
+    sign_in,
+    sign_in_as_admin,
+    with_database_url,
+    with_telegram,
+)
 
 ALEMBIC_INI = Path(__file__).resolve().parent.parent / "alembic.ini"
 
@@ -61,6 +69,12 @@ def valid_env(clean_env: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
 @pytest.fixture
 def settings(valid_env: pytest.MonkeyPatch) -> Settings:
     return load_config(env_file=None)
+
+
+@pytest.fixture
+def telegram_settings(settings: Settings) -> Settings:
+    """Settings with a (fake) bot configured. Telegram itself is always mocked with respx."""
+    return with_telegram(settings)
 
 
 # ---------------------------------------------------------------- real Postgres
@@ -147,14 +161,25 @@ async def api_client(
     *,
     extractor: Extractor | None = None,
     extraction_limiter: SlidingWindowLimiter | None = None,
+    telegram: TelegramClient | None = None,
 ) -> AsyncIterator[httpx.AsyncClient]:
     """Like the `api` fixture, for tests that need different settings, limits or a fake
-    extractor (CI never calls a real LLM).
+    extractor (CI never calls a real LLM), or a Telegram client (None = no bot).
+
+    Background tasks get `db_session` too (via get_session_factory), so what they write is
+    visible to the test and rolled back with everything else.
 
     Sends the frontend's Origin on every request, like a browser on our site would.
     """
     app = create_app(settings)
     app.dependency_overrides[get_session] = lambda: db_session
+
+    @asynccontextmanager
+    async def same_session() -> AsyncIterator[AsyncSession]:
+        yield db_session  # not closed here: the fixture owns it
+
+    app.dependency_overrides[get_session_factory] = lambda: same_session
+    app.dependency_overrides[get_telegram] = lambda: telegram
     if limiters is not None:
         app.state.auth_limiters = limiters
     if extractor is not None:

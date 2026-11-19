@@ -149,6 +149,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/telegram-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Telegram Link
+         * @description A one-time deep link (15 minutes) that connects this account to a Telegram chat.
+         */
+        post: operations["post_telegram_link_me_telegram_link_post"];
+        /**
+         * Delete Telegram Link
+         * @description Disconnect Telegram (no more alerts). Safe to call when not connected.
+         */
+        delete: operations["delete_telegram_link_me_telegram_link_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/branches": {
         parameters: {
             query?: never;
@@ -288,6 +312,8 @@ export interface paths {
         /**
          * Patch
          * @description Edit fields, publish ({"status": "published"}) or close ({"status": "closed"}).
+         *
+         *     Publishing also sends a Telegram alert to every eligible student who linked Telegram.
          */
         patch: operations["patch_admin_drives__drive_id__patch"];
         trace?: never;
@@ -639,6 +665,8 @@ export interface components {
             /** Role */
             role: string;
             profile: components["schemas"]["ProfileOut"] | null;
+            /** Telegram Available */
+            telegram_available: boolean;
         };
         /** ProfileIn */
         ProfileIn: {
@@ -764,6 +792,19 @@ export interface components {
             eligible: boolean;
             /** Reasons */
             reasons: string[];
+        };
+        /**
+         * TelegramLinkOut
+         * @description POST /me/telegram-link. Open `url` in Telegram and press Start within 15 minutes.
+         */
+        TelegramLinkOut: {
+            /** Url */
+            url: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
         };
         /** TrackedDriveOut */
         TrackedDriveOut: {
@@ -1106,6 +1147,72 @@ export interface operations {
             };
             /** @description Invalid values or unknown branch */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    post_telegram_link_me_telegram_link_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramLinkOut"];
+                };
+            };
+            /** @description Not logged in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Telegram isn't set up on this server */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Save a profile first */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    delete_telegram_link_me_telegram_link_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not logged in */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

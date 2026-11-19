@@ -7,6 +7,9 @@ Status: **v2.2, decisions locked** (2026-11-18). Change decisions here first, th
 
 ## Changelog
 
+### v2.2 notes (Day 8, 2026-11-19)
+- §5 F5 / §7.2: Telegram is optional: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET` and `TELEGRAM_BOT_USERNAME` are all set or all empty (the app refuses a partial set); empty = no links, no alerts, webhook 404. `APP_BASE_URL` (optional) puts a drive link in alerts. The webhook secret is checked in a router dependency (before the body is parsed: 401, never 422) and only private chats can link. `/start` replies go in the webhook response body (no outbound call). A chat linked to another account moves to the newest one. `GET /me` adds `telegram_available`; `DELETE /me/telegram-link` disconnects. New-drive alerts: a background task after draft → published only (edits never re-alert), its own DB session; temporary send failure deletes the `notifications` row (retryable), 403 also unlinks the chat. Plain-text messages (no `parse_mode`). httpx/httpcore loggers at WARNING because the bot token is in Bot API URLs. `notifications` FKs `ON DELETE CASCADE`. Webhook registration: `app.scripts.set_telegram_webhook`.
+
 ### v2.2 notes (Day 7, 2026-11-19)
 - §8 / F4: application responses carry `next_statuses` (from `state_machine.next_statuses`, the one `TRANSITIONS` dict); `GET /drives/{id}` adds `application` (this student's tracker or null) and `next_statuses` (the starts when not tracking). The frontend draws one button per allowed move and never copies the rules; the server still enforces every move (409). §7.3: `frontend/vercel.json` holds the `/api/:path*` rewrite to Render, an SPA fallback, and security headers (strict CSP with no inline script/style, nosniff, Referrer-Policy, Permissions-Policy, HSTS); `vite preview` serves the same headers locally. Admin deadlines are typed as IST wall-clock time and sent with an explicit `+05:30` offset.
 
@@ -444,7 +447,8 @@ Config comes only from env vars, loaded and validated once at startup by `load_c
 | `SESSION_TTL_HOURS` | no (default 168) | |
 | `SESSION_COOKIE_SECURE` | no (default `true`) | `false` only allowed in `dev`; the cookie is then named `session` instead of `__Host-session` (§7.3) |
 | `CRON_SECRET` | yes | Header for `/internal/run-reminders` |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET` | from Day 8 | |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_BOT_USERNAME` | no (all or none) | Empty = Telegram off. Secret: 16–256 of `A-Z a-z 0-9 _ -` (Telegram's rule) |
+| `APP_BASE_URL` | no | Public frontend URL, for drive links inside alerts |
 | `LLM_PROVIDER` | no (default `none`) | `none` \| `openai_compatible` |
 | `LLM_BASE_URL`, `LLM_MODEL` | if provider ≠ `none` | |
 | `LLM_API_KEY` | optional | Some local servers need none |
@@ -493,7 +497,8 @@ POST   /auth/register            -> email, password, name, invite_code
 POST   /auth/login               -> sets __Host-session (rate-limited)
 POST   /auth/logout              -> deletes the session
 GET    /me                       PUT  /me/profile
-POST   /me/telegram-link         -> returns deep link (15-min one-time token)
+POST   /me/telegram-link         -> returns deep link (15-min one-time token); 404 if no bot, 409 without profile
+DELETE /me/telegram-link         -> disconnect Telegram
 GET    /branches                 -> branch codes + names
 
 GET    /drives                   -> open drives + eligibility result per drive (409 until profile saved)

@@ -67,8 +67,16 @@ export const profile: Schemas["ProfileOut"] = {
   telegram_linked: false,
 };
 
-export function meWith(p: Schemas["ProfileOut"] | null): Schemas["MeOut"] {
-  return { id: "11111111-1111-1111-1111-111111111111", email: "asha@example.com", name: "Asha", role: "student", profile: p };
+export function meWith(p: Schemas["ProfileOut"] | null, extra: Partial<Schemas["MeOut"]> = {}): Schemas["MeOut"] {
+  return {
+    id: "11111111-1111-1111-1111-111111111111",
+    email: "asha@example.com",
+    name: "Asha",
+    role: "student",
+    profile: p,
+    telegram_available: false,
+    ...extra,
+  };
 }
 
 export function drive(overrides: Partial<Schemas["StudentDriveOut"]> = {}): Schemas["StudentDriveOut"] {

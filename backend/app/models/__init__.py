@@ -5,6 +5,7 @@ from app.models.base import Base
 from app.models.branch import Branch, BranchAlias
 from app.models.drive import Drive, DriveAllowedBranch, DriveEligibility
 from app.models.extraction import ExtractionRun
+from app.models.notification import Notification
 from app.models.profile import StudentProfile
 from app.models.user import User, UserSession
 
@@ -18,6 +19,7 @@ __all__ = [
     "DriveAllowedBranch",
     "DriveEligibility",
     "ExtractionRun",
+    "Notification",
     "StudentProfile",
     "User",
     "UserSession",

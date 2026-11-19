@@ -16,10 +16,12 @@ from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import Settings
+from app.core.db import SessionFactory
 from app.core.rate_limit import AuthLimiters, SlidingWindowLimiter
 from app.models import User
 from app.services.auth import user_for_token
 from app.services.extraction.extractors import Extractor, ManualExtractor, build_extractor
+from app.services.telegram import TelegramClient
 
 
 def get_settings(request: Request) -> Settings:
@@ -87,3 +89,24 @@ def get_extraction_limiter(request: Request) -> SlidingWindowLimiter:
 
 
 ExtractionLimiter = Annotated[SlidingWindowLimiter, Depends(get_extraction_limiter)]
+
+
+def get_telegram(request: Request, settings: AppSettings) -> TelegramClient | None:
+    """The bot client, or None when Telegram isn't configured. Tests override this."""
+    if settings.telegram_bot_token is None:
+        return None
+    token = settings.telegram_bot_token.get_secret_value()
+    return TelegramClient(request.app.state.http_client, token)
+
+
+Telegram = Annotated[TelegramClient | None, Depends(get_telegram)]
+
+
+def get_session_factory(request: Request) -> SessionFactory:
+    """For background tasks. They run after the response is sent, when the request's own
+    session is already closed, so they open their own. Tests override this."""
+    sessionmaker: async_sessionmaker[AsyncSession] = request.app.state.sessionmaker
+    return sessionmaker
+
+
+SessionFactoryDep = Annotated[SessionFactory, Depends(get_session_factory)]
