@@ -14,7 +14,7 @@ Interview notes:
   an array because there is nothing for them to reference.
 - One `drive_eligibility` row per drive (created with the drive), so loading rules never
   needs an "if the row exists" branch. NULL / empty = no restriction.
-- `extraction_run_id` (DESIGN §6) is added on Day 4, together with `extraction_runs`.
+- `extraction_run_id` links a drive to the AI run its draft came from (Day 4).
 """
 
 import uuid
@@ -64,6 +64,10 @@ class Drive(Base):
     raw_text: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(Text, default="draft", server_default="draft")
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # The AI run this drive's draft came from (NULL for manual entry).
+    extraction_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("extraction_runs.id", ondelete="SET NULL")
+    )
     created_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL")
     )

@@ -85,6 +85,8 @@ class DriveCreate(BaseModel):
     source: Source | None = None
     raw_text: RawText
     eligibility: EligibilityRulesIn = EligibilityRulesIn()
+    # Set when the admin started from an AI draft (POST /admin/drives/extract).
+    extraction_run_id: uuid.UUID | None = None
 
 
 _REQUIRED_ON_PATCH = ("company", "role_title", "deadline", "raw_text", "status", "eligibility")
@@ -145,6 +147,7 @@ class AdminDriveOut(DriveFields):
     status: Literal["draft", "published", "closed"]
     source: str | None
     raw_text: str
+    extraction_run_id: uuid.UUID | None
     closed_at: datetime | None
     created_at: datetime
     updated_at: datetime

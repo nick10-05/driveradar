@@ -7,6 +7,8 @@ Interview notes:
   which is the human approval step the AI boundary (D9) relies on from Day 4.
 - Errors map to clear statuses: 404 unknown drive, 409 illegal status change or edit to a
   closed drive, 422 bad input (past deadline on publish, unknown branch codes).
+- /extract only returns a draft for the review form; the AI never creates or publishes
+  a drive (D9). It is capped per admin (30/hour) to protect a free-tier LLM quota.
 """
 
 import uuid
@@ -15,7 +17,15 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.api.deps import CurrentAdmin, DbSession, current_admin
+from app.api.auth import too_many_attempts
+from app.api.deps import (
+    AppSettings,
+    ConfiguredExtractor,
+    CurrentAdmin,
+    DbSession,
+    ExtractionLimiter,
+    current_admin,
+)
 from app.api.drive_views import admin_view
 from app.schemas.drive import AdminDriveOut, DriveCreate, DriveUpdate
 from app.services.drives import (
@@ -23,11 +33,14 @@ from app.services.drives import (
     DriveStateError,
     PastDeadlineError,
     UnknownBranchesError,
+    UnknownExtractionRunError,
     create_drive,
     get_drive,
     list_all_drives,
     update_drive,
 )
+from app.services.extraction.pipeline import run_extraction
+from app.services.extraction.schema import ExtractIn, ExtractOut
 
 router = APIRouter(
     prefix="/admin/drives",
@@ -57,12 +70,54 @@ async def list_drives(session: DbSession) -> list[AdminDriveOut]:
     return [admin_view(drive, now) for drive in await list_all_drives(session)]
 
 
+@router.post(
+    "/extract",
+    responses={status.HTTP_429_TOO_MANY_REQUESTS: {"description": "Extraction limit reached"}},
+)
+async def extract(
+    data: ExtractIn,
+    admin: CurrentAdmin,
+    session: DbSession,
+    settings: AppSettings,
+    extractor: ConfiguredExtractor,
+    limiter: ExtractionLimiter,
+) -> ExtractOut:
+    """Notice text in → AI draft + per-field issues out. Saves no drive.
+
+    Always 200, even when the AI is off or fails: the draft is then just empty and the
+    admin fills the form by hand (status says why). Save it with POST /admin/drives,
+    passing extraction_run_id.
+    """
+    retry_after = limiter.hit(str(admin.id))
+    if retry_after is not None:
+        raise too_many_attempts(retry_after, "extraction")
+    output = await run_extraction(
+        session,
+        extractor,
+        raw_text=data.raw_text,
+        provider=settings.llm_provider,
+        created_by=admin.id,
+    )
+    return ExtractOut(
+        extraction_run_id=output.run.id,
+        status=output.status,
+        provider=output.run.provider,
+        model=output.run.model,
+        draft=output.draft,
+        issues=output.issues,
+    )
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create(data: DriveCreate, admin: CurrentAdmin, session: DbSession) -> AdminDriveOut:
     try:
         drive = await create_drive(session, data, created_by=admin.id)
     except UnknownBranchesError as exc:
         raise _unknown_branches(exc) from None
+    except UnknownExtractionRunError:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown extraction_run_id"
+        ) from None
     return admin_view(drive, datetime.now(UTC))
 
 

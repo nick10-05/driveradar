@@ -15,11 +15,12 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_session
+from app.api.deps import get_extractor, get_session
 from app.core.config import Settings, load_config
 from app.core.db import create_engine
-from app.core.rate_limit import AuthLimiters
+from app.core.rate_limit import AuthLimiters, SlidingWindowLimiter
 from app.factory import create_app
+from app.services.extraction.extractors import Extractor
 from tests.helpers import INVITE_CODE, with_database_url
 
 ALEMBIC_INI = Path(__file__).resolve().parent.parent / "alembic.ini"
@@ -123,9 +124,15 @@ async def api(settings: Settings, db_session: AsyncSession) -> AsyncIterator[htt
 
 @asynccontextmanager
 async def api_client(
-    settings: Settings, db_session: AsyncSession, limiters: AuthLimiters | None = None
+    settings: Settings,
+    db_session: AsyncSession,
+    limiters: AuthLimiters | None = None,
+    *,
+    extractor: Extractor | None = None,
+    extraction_limiter: SlidingWindowLimiter | None = None,
 ) -> AsyncIterator[httpx.AsyncClient]:
-    """Like the `api` fixture, for tests that need different settings or limits.
+    """Like the `api` fixture, for tests that need different settings, limits or a fake
+    extractor (CI never calls a real LLM).
 
     Sends the frontend's Origin on every request, like a browser on our site would.
     """
@@ -133,6 +140,10 @@ async def api_client(
     app.dependency_overrides[get_session] = lambda: db_session
     if limiters is not None:
         app.state.auth_limiters = limiters
+    if extractor is not None:
+        app.dependency_overrides[get_extractor] = lambda: extractor
+    if extraction_limiter is not None:
+        app.state.extraction_limiter = extraction_limiter
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(
         transport=transport,

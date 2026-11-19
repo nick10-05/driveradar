@@ -25,7 +25,14 @@ from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import Branch, Drive, DriveAllowedBranch, DriveEligibility, StudentProfile
+from app.models import (
+    Branch,
+    Drive,
+    DriveAllowedBranch,
+    DriveEligibility,
+    ExtractionRun,
+    StudentProfile,
+)
 from app.schemas.drive import DriveCreate, DriveState, DriveUpdate, EligibilityRulesIn
 from app.services.eligibility import (
     EligibilityResult,
@@ -57,6 +64,10 @@ class DriveStateError(Exception):
 
 
 class PastDeadlineError(Exception):
+    pass
+
+
+class UnknownExtractionRunError(Exception):
     pass
 
 
@@ -165,6 +176,10 @@ def _column_values(data: DriveCreate | DriveUpdate, *, only_sent: bool) -> dict[
 async def create_drive(session: AsyncSession, data: DriveCreate, created_by: uuid.UUID) -> Drive:
     """Always creates a draft. Publishing is a separate, deliberate step."""
     await _check_branches(session, data.eligibility.allowed_branches)
+    if data.extraction_run_id is not None and (
+        await session.get(ExtractionRun, data.extraction_run_id) is None
+    ):
+        raise UnknownExtractionRunError
     drive = Drive(**_column_values(data, only_sent=False), created_by=created_by, status="draft")
     _set_rules(drive, data.eligibility)
     session.add(drive)

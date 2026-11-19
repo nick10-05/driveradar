@@ -16,9 +16,10 @@ from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import Settings
-from app.core.rate_limit import AuthLimiters
+from app.core.rate_limit import AuthLimiters, SlidingWindowLimiter
 from app.models import User
 from app.services.auth import user_for_token
+from app.services.extraction.extractors import Extractor, ManualExtractor, build_extractor
 
 
 def get_settings(request: Request) -> Settings:
@@ -68,3 +69,21 @@ async def current_admin(user: CurrentUser) -> User:
 
 
 CurrentAdmin = Annotated[User, Depends(current_admin)]
+
+
+def get_extractor(request: Request, settings: AppSettings) -> Extractor:
+    """The configured extractor (D10). Tests override this with a FakeExtractor."""
+    if settings.llm_provider == "none":
+        return ManualExtractor()
+    return build_extractor(settings, request.app.state.http_client)
+
+
+ConfiguredExtractor = Annotated[Extractor, Depends(get_extractor)]
+
+
+def get_extraction_limiter(request: Request) -> SlidingWindowLimiter:
+    limiter: SlidingWindowLimiter = request.app.state.extraction_limiter
+    return limiter
+
+
+ExtractionLimiter = Annotated[SlidingWindowLimiter, Depends(get_extraction_limiter)]

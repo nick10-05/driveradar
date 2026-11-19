@@ -10,6 +10,7 @@ Interview notes:
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
 
 from app.api import admin_drives, auth, branches, drives, health, me
@@ -18,7 +19,7 @@ from app.core.db import create_engine, create_sessionmaker
 from app.core.errors import register_error_handlers
 from app.core.logging import configure_logging
 from app.core.origin import OriginCheckMiddleware
-from app.core.rate_limit import AuthLimiters
+from app.core.rate_limit import AuthLimiters, SlidingWindowLimiter
 from app.core.request_id import RequestIdMiddleware
 
 
@@ -30,9 +31,13 @@ def create_app(settings: Settings) -> FastAPI:
         engine = create_engine(settings)
         app.state.engine = engine
         app.state.sessionmaker = create_sessionmaker(engine)
+        # One shared HTTP client (connection pooling) for outbound calls: the LLM today,
+        # Telegram on Day 8. Each call sets its own timeout.
+        app.state.http_client = httpx.AsyncClient()
         try:
             yield
         finally:
+            await app.state.http_client.aclose()
             await engine.dispose()
 
     app = FastAPI(title="DriveRadar API", version="0.1.0", lifespan=lifespan)
@@ -41,6 +46,8 @@ def create_app(settings: Settings) -> FastAPI:
     app.state.settings = settings
     # Per-app (not module-global) so every test app starts with empty counters.
     app.state.auth_limiters = AuthLimiters.default()
+    # Extraction is admin-only, but still capped: protects a free-tier LLM quota (§4.7).
+    app.state.extraction_limiter = SlidingWindowLimiter(30, 60 * 60)
     # Starlette runs the LAST added middleware first: request IDs wrap everything, so even
     # a rejected-Origin response is logged with its request ID.
     app.add_middleware(OriginCheckMiddleware, allowed_origins=settings.allowed_origins)

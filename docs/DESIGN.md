@@ -7,6 +7,9 @@ Status: **v2.2, decisions locked** (2026-11-18). Change decisions here first, th
 
 ## Changelog
 
+### v2.2 notes (Day 4, 2026-11-19)
+- §4.5: "all branches" = no restriction; all-unknown branches flagged as widening. §4.6: partial output only after the one retry; extractor exceptions caught. §6: `extraction_runs.error` (short code); `drives.extraction_run_id ON DELETE SET NULL`. Extraction limit: 30 per hour per admin; `/extract` always returns 200 with a (possibly empty) draft.
+
 ### v2.2 notes (Day 3, 2026-11-19)
 - §5 F2: allowed drive status changes written down. §6: `drives.created_by` is `ON DELETE SET NULL`; `extraction_run_id` arrives with `extraction_runs` on Day 4. §8: `GET /admin/drives` (+ `/{id}`) added for the admin review screen; feed is 409 until the profile is saved.
 
@@ -173,7 +176,7 @@ Pure functions, unit-tested heavily. Input: validated `ExtractedNotice` + `raw_t
 
 1. **Evidence check:** each non-null key field (company, deadline, min_cgpa, branches, backlogs, grad_years, ctc) must have an evidence quote that appears in `raw_text`, after normalising whitespace and case. If it doesn't, the field gets a `verify` flag. This is a cheap guard against hallucinated values.
 2. **Deadline:** parse `deadline_local`. If there's no timezone, assume **IST**. Convert to **UTC**. A deadline in the past or more than a year ahead gets flagged.
-3. **Branches:** map each `branches_raw` entry through `branch_aliases` to a branch code. Unknown names get flagged and are never silently dropped.
+3. **Branches:** map each `branches_raw` entry through `branch_aliases` to a branch code. Unknown names get flagged and are never silently dropped. "All branches" / "any branch" means no restriction. If **no** name can be mapped, the flag says so explicitly: an empty list would mean "all branches" and silently widen the drive.
 4. **Sanity checks:** CGPA between 0 and 10, backlogs ≥ 0, grad years within ±2 years of now, `ctc_lpa` in a plausible range, `apply_link` is http(s).
 5. **Pass-through:** fields that fail validation are set to null + flagged. A bad field never blocks the rest of the draft.
 
@@ -184,7 +187,8 @@ Pure functions, unit-tested heavily. Input: validated `ExtractedNotice` + `raw_t
 | `LLM_PROVIDER=none` | Empty draft, status `disabled` |
 | Timeout, network error, HTTP 4xx/5xx, rate limit (429) | Empty draft, status `error` |
 | Output isn't valid JSON or fails Pydantic | **One** retry with the validation error included in the request. If that fails too, empty draft, status `invalid` |
-| Partially valid output | Valid fields kept, the rest null + flagged |
+| Partially valid output | Same one retry first. If the retry is a JSON object with some wrongly-typed fields: valid fields kept, the rest null + flagged |
+| Unexpected exception inside an extractor | Caught by the pipeline: empty draft, status `error` (`error = 'unexpected'`) |
 
 In every case the admin can still enter a drive manually in the same form. **AI speeds up the workflow. It is never a single point of failure.**
 
@@ -302,6 +306,7 @@ extraction_runs(
   model           text,                        -- NULL when provider = 'none'
   prompt_version  text NOT NULL,
   status          text NOT NULL CHECK (status IN ('ok','invalid','error','disabled')),
+  error           text,                        -- short code: 'timeout', 'http_429', 'invalid_output', ...
   output_json     jsonb,                       -- normalised draft
   issues          jsonb NOT NULL DEFAULT '[]', -- per-field flags
   latency_ms      int,
@@ -323,7 +328,7 @@ drives(
   raw_text           text NOT NULL,
   status             text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','closed')),
   closed_at          timestamptz,              -- set only by a manual close
-  extraction_run_id  uuid REFERENCES extraction_runs(id),  -- added on Day 4 with extraction_runs
+  extraction_run_id  uuid REFERENCES extraction_runs(id) ON DELETE SET NULL,  -- NULL = manual entry
   created_by         uuid REFERENCES users(id) ON DELETE SET NULL,
   created_at         timestamptz NOT NULL DEFAULT now(),
   updated_at         timestamptz NOT NULL DEFAULT now()

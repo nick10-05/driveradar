@@ -40,6 +40,7 @@ def admin_view(drive: Drive, now: datetime) -> AdminDriveOut:
             "status": drive.status,
             "source": drive.source,
             "raw_text": drive.raw_text,
+            "extraction_run_id": drive.extraction_run_id,
             "closed_at": drive.closed_at,
             "created_at": drive.created_at,
             "updated_at": drive.updated_at,
