@@ -160,5 +160,5 @@ class StudentDriveOut(DriveFields):
     reasons: list[str]
 
 
-class StudentDriveDetailOut(StudentDriveOut):
-    raw_text: str  # the original notice, only on the detail page (it can be long)
+# StudentDriveDetailOut lives in schemas/application.py: it embeds the student's tracker,
+# and application.py already imports from this module (no import cycle).

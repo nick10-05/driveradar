@@ -37,6 +37,21 @@ FINAL = frozenset(status for status, nexts in TRANSITIONS.items() if not nexts)
 INITIAL = frozenset({"interested", "applied"})
 
 
+# Display order for clients: the happy path first, then the exits.
+ORDER = ("interested", "applied", "test", "interview", "offer", "rejected", "withdrawn")
+
+
+def next_statuses(current: str | None) -> list[str]:
+    """Where this tracker can go from `current` (None = not tracked yet), in ORDER.
+
+    Sent to the frontend so it shows only the moves the server will accept: the policy
+    stays in this one dict instead of being copied into TypeScript. The server still
+    checks every move, so a stale or tampered client just gets a 409.
+    """
+    allowed = INITIAL if current is None else TRANSITIONS.get(current, frozenset())
+    return [status for status in ORDER if status in allowed]
+
+
 def can_move(current: str, new: str) -> bool:
     return new in TRANSITIONS.get(current, frozenset())
 

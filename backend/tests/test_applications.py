@@ -18,7 +18,7 @@ from app.core.db import create_engine
 from app.models import Application, ApplicationEvent, Drive, User
 from app.services.applications import set_status
 from tests.conftest import api_client
-from tests.helpers import create, iso, publish, sign_in, with_database_url
+from tests.helpers import create, iso, profile, publish, sign_in, with_database_url
 
 pytestmark = [pytest.mark.anyio, pytest.mark.db]
 
@@ -224,6 +224,52 @@ async def test_each_student_sees_only_their_own_tracker(
         assert (await put(other, drive["id"], status="interested")).status_code == 200
 
     assert (await student.get("/me/applications")).json()[0]["status"] == "applied"
+
+
+# ---------------------------------------------------------------- next moves (Day 7)
+
+
+async def test_responses_list_the_moves_the_server_accepts(
+    admin: httpx.AsyncClient, student: httpx.AsyncClient
+) -> None:
+    drive = await publish(admin)
+
+    body = (await put(student, drive["id"], status="applied")).json()
+    assert body["next_statuses"] == ["test", "interview", "rejected", "withdrawn"]
+    # Every listed move is really accepted...
+    assert (await put(student, drive["id"], status=body["next_statuses"][1])).status_code == 200
+    body = (await put(student, drive["id"], status="offer")).json()
+    # ...and a final state lists none.
+    assert body["next_statuses"] == []
+    tracker = (await student.get("/me/applications")).json()
+    assert tracker[0]["next_statuses"] == []
+
+
+async def test_drive_page_shows_my_tracker_and_next_moves(
+    admin: httpx.AsyncClient,
+    student: httpx.AsyncClient,
+    settings: Settings,
+    db_session: AsyncSession,
+) -> None:
+    drive = await publish(admin)
+
+    before = (await student.get(f"/drives/{drive['id']}")).json()
+    assert before["application"] is None
+    assert before["next_statuses"] == ["interested", "applied"]
+
+    await put(student, drive["id"], status="interested", notes="Ask seniors about the test")
+    after = (await student.get(f"/drives/{drive['id']}")).json()
+    assert after["application"]["status"] == "interested"
+    assert after["application"]["notes"] == "Ask seniors about the test"
+    assert moves(after["application"]) == [(None, "interested")]
+    assert after["next_statuses"] == ["applied", "withdrawn"]
+
+    # Another student's page for the same drive never shows my tracker.
+    async with api_client(settings, db_session) as other:
+        await sign_in(other, "other@example.com")
+        await other.put("/me/profile", json=profile())
+        theirs = (await other.get(f"/drives/{drive['id']}")).json()
+        assert theirs["application"] is None
 
 
 # ---------------------------------------------------------------- concurrency

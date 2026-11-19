@@ -6,6 +6,7 @@ export function Layout() {
   const me = useMe();
   const logout = useLogout();
   const navigate = useNavigate();
+  const isAdmin = me.data?.role === "admin";
 
   return (
     <div className="app">
@@ -17,7 +18,9 @@ export function Layout() {
           <NavLink to="/" end>
             Drives
           </NavLink>
+          <NavLink to="/tracker">Tracker</NavLink>
           <NavLink to="/profile">Profile</NavLink>
+          {isAdmin && <NavLink to="/admin">Admin</NavLink>}
           <button
             type="button"
             className="link-button"

@@ -115,6 +115,18 @@ async def get_application(session: AsyncSession, application_id: uuid.UUID) -> A
     return application
 
 
+async def find_application(
+    session: AsyncSession, student_id: uuid.UUID, drive_id: uuid.UUID
+) -> Application | None:
+    """This student's tracker for one drive (with its timeline), or None."""
+    statement = (
+        select(Application)
+        .where(Application.student_id == student_id, Application.drive_id == drive_id)
+        .options(selectinload(Application.events))
+    )
+    return await session.scalar(statement)
+
+
 async def list_applications(
     session: AsyncSession, student_id: uuid.UUID
 ) -> Sequence[tuple[Application, Drive]]:

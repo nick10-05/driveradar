@@ -18,9 +18,14 @@ from fastapi import APIRouter, HTTPException, status
 from app.api.deps import CurrentUser, DbSession
 from app.api.drive_views import application_view, student_detail_view, student_view
 from app.models import StudentProfile, User
-from app.schemas.application import ApplicationIn, ApplicationOut
-from app.schemas.drive import StudentDriveDetailOut, StudentDriveOut
-from app.services.applications import IllegalMoveError, TrackerDriveNotFoundError, set_status
+from app.schemas.application import ApplicationIn, ApplicationOut, StudentDriveDetailOut
+from app.schemas.drive import StudentDriveOut
+from app.services.applications import (
+    IllegalMoveError,
+    TrackerDriveNotFoundError,
+    find_application,
+    set_status,
+)
 from app.services.drives import DriveNotFoundError, facts_of, feed, get_drive, rules_of
 from app.services.eligibility import check_eligibility
 from app.services.profiles import get_profile
@@ -61,7 +66,8 @@ async def get_one_drive(
     except DriveNotFoundError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Drive not found") from None
     result = check_eligibility(facts_of(profile), rules_of(drive))
-    return student_detail_view(drive, result, datetime.now(UTC))
+    application = await find_application(session, user.id, drive.id)
+    return student_detail_view(drive, result, application, datetime.now(UTC))
 
 
 @router.put(

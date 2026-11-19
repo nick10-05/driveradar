@@ -920,6 +920,22 @@
             },
             "type": "array",
             "title": "Timeline"
+          },
+          "next_statuses": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "interested",
+                "applied",
+                "test",
+                "interview",
+                "offer",
+                "rejected",
+                "withdrawn"
+              ]
+            },
+            "type": "array",
+            "title": "Next Statuses"
           }
         },
         "type": "object",
@@ -929,7 +945,8 @@
           "status",
           "notes",
           "updated_at",
-          "timeline"
+          "timeline",
+          "next_statuses"
         ],
         "title": "ApplicationOut"
       },
@@ -1929,6 +1946,32 @@
           "raw_text": {
             "type": "string",
             "title": "Raw Text"
+          },
+          "application": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApplicationOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next_statuses": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "interested",
+                "applied",
+                "test",
+                "interview",
+                "offer",
+                "rejected",
+                "withdrawn"
+              ]
+            },
+            "type": "array",
+            "title": "Next Statuses"
           }
         },
         "type": "object",
@@ -1945,9 +1988,12 @@
           "eligibility",
           "eligible",
           "reasons",
-          "raw_text"
+          "raw_text",
+          "application",
+          "next_statuses"
         ],
-        "title": "StudentDriveDetailOut"
+        "title": "StudentDriveDetailOut",
+        "description": "GET /drives/{id}: the drive, the notice, and this student's tracker for it."
       },
       "StudentDriveOut": {
         "properties": {
@@ -2145,6 +2191,22 @@
             "type": "array",
             "title": "Timeline"
           },
+          "next_statuses": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "interested",
+                "applied",
+                "test",
+                "interview",
+                "offer",
+                "rejected",
+                "withdrawn"
+              ]
+            },
+            "type": "array",
+            "title": "Next Statuses"
+          },
           "drive": {
             "$ref": "#/components/schemas/TrackedDriveOut"
           }
@@ -2157,6 +2219,7 @@
           "notes",
           "updated_at",
           "timeline",
+          "next_statuses",
           "drive"
         ],
         "title": "TrackerEntryOut"

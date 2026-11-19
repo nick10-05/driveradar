@@ -12,10 +12,15 @@ import { QueryCache, QueryClient, useMutation, useQuery, useQueryClient } from "
 
 import { api, isApiError, unwrap, type Schemas } from "./client";
 
+// Keys are prefixes: invalidating ["drives"] also refreshes every ["drives", id].
 export const keys = {
   me: ["me"] as const,
   branches: ["branches"] as const,
   drives: ["drives"] as const,
+  drive: (id: string) => ["drives", id] as const,
+  applications: ["applications"] as const,
+  adminDrives: ["admin", "drives"] as const,
+  adminDrive: (id: string) => ["admin", "drives", id] as const,
 };
 
 export function createQueryClient(): QueryClient {
@@ -119,4 +124,92 @@ export function useSaveProfile() {
 export function describeError(error: unknown): string {
   if (isApiError(error)) return error.message;
   return "Can't reach the server. Check your connection and try again.";
+}
+
+// ---------------------------------------------------------------- drive page + tracker (Day 7)
+
+export type Status = Schemas["ApplicationIn"]["status"];
+
+export function useDrive(id: string) {
+  return useQuery({
+    queryKey: keys.drive(id),
+    queryFn: () => unwrap(api.GET("/drives/{drive_id}", { params: { path: { drive_id: id } } })),
+  });
+}
+
+export function useApplications() {
+  return useQuery({
+    queryKey: keys.applications,
+    queryFn: () => unwrap(api.GET("/me/applications")),
+  });
+}
+
+/** Start tracking or move status. `notes` omitted = keep, null = clear (API contract). */
+export function useSetApplication(driveId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Schemas["ApplicationIn"]) =>
+      unwrap(
+        api.PUT("/drives/{drive_id}/application", {
+          params: { path: { drive_id: driveId } },
+          body,
+        }),
+      ),
+    onSettled: async () => {
+      // Also after a 409: someone may have moved it from another tab; show the truth.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: keys.drive(driveId) }),
+        queryClient.invalidateQueries({ queryKey: keys.applications }),
+      ]);
+    },
+  });
+}
+
+// ---------------------------------------------------------------- admin (Day 7)
+
+export function useAdminDrives() {
+  return useQuery({ queryKey: keys.adminDrives, queryFn: () => unwrap(api.GET("/admin/drives")) });
+}
+
+export function useAdminDrive(id: string) {
+  return useQuery({
+    queryKey: keys.adminDrive(id),
+    queryFn: () =>
+      unwrap(api.GET("/admin/drives/{drive_id}", { params: { path: { drive_id: id } } })),
+  });
+}
+
+export function useExtract() {
+  return useMutation({
+    mutationFn: (raw_text: string) =>
+      unwrap(api.POST("/admin/drives/extract", { body: { raw_text } })),
+  });
+}
+
+async function refreshDriveLists(queryClient: QueryClient) {
+  // A publish/close/edit changes what students see too.
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: keys.adminDrives }),
+    queryClient.invalidateQueries({ queryKey: keys.drives }),
+  ]);
+}
+
+export function useCreateDrive() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Schemas["DriveCreate"]) => unwrap(api.POST("/admin/drives", { body })),
+    onSuccess: () => refreshDriveLists(queryClient),
+  });
+}
+
+export function useUpdateDrive(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Schemas["DriveUpdate"]) =>
+      unwrap(api.PATCH("/admin/drives/{drive_id}", { params: { path: { drive_id: id } }, body })),
+    onSuccess: (drive) => {
+      queryClient.setQueryData(keys.adminDrive(id), drive);
+      return refreshDriveLists(queryClient);
+    },
+  });
 }

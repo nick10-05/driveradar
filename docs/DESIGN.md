@@ -7,6 +7,9 @@ Status: **v2.2, decisions locked** (2026-11-18). Change decisions here first, th
 
 ## Changelog
 
+### v2.2 notes (Day 7, 2026-11-19)
+- §8 / F4: application responses carry `next_statuses` (from `state_machine.next_statuses`, the one `TRANSITIONS` dict); `GET /drives/{id}` adds `application` (this student's tracker or null) and `next_statuses` (the starts when not tracking). The frontend draws one button per allowed move and never copies the rules; the server still enforces every move (409). §7.3: `frontend/vercel.json` holds the `/api/:path*` rewrite to Render, an SPA fallback, and security headers (strict CSP with no inline script/style, nosniff, Referrer-Policy, Permissions-Policy, HSTS); `vite preview` serves the same headers locally. Admin deadlines are typed as IST wall-clock time and sent with an explicit `+05:30` offset.
+
 ### v2.2 notes (Day 6, 2026-11-19)
 - §7.6: the exported schema lives at `frontend/openapi.json` (committed); `export_openapi --check` is the CI drift check, and the CI `frontend` job regenerates `src/api/schema.d.ts` and fails on a diff, then lint, `tsc`, vitest, build. D2: frontend tooling (Node 24) runs natively on Windows (signed `node.exe`; esbuild/rolldown binaries verified to run under Smart App Control); Python and git stay in WSL. TypeScript pinned to 5.9 (openapi-typescript needs `^5`, typescript-eslint `<6.1`). Session cookie never touched by JS; `RequireAuth` is UX only; post-login redirect comes from router state, validated to internal paths.
 

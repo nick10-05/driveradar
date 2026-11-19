@@ -5,10 +5,12 @@ import pytest
 from app.services.state_machine import (
     FINAL,
     INITIAL,
+    ORDER,
     STATUSES,
     TRANSITIONS,
     can_move,
     can_start,
+    next_statuses,
 )
 
 ALLOWED = {
@@ -77,3 +79,31 @@ def test_every_state_is_reachable_from_a_start() -> None:
                 reached.add(nxt)
                 frontier.append(nxt)
     assert reached == STATUSES
+
+
+# ---------------------------------------------------------------- next_statuses (Day 7)
+
+
+def test_order_lists_every_status_once() -> None:
+    assert sorted(ORDER) == sorted(STATUSES)
+    assert len(ORDER) == len(STATUSES)
+
+
+def test_next_statuses_before_tracking_are_the_starts() -> None:
+    assert next_statuses(None) == ["interested", "applied"]
+
+
+@pytest.mark.parametrize("current", sorted(STATUSES))
+def test_next_statuses_match_the_transitions_dict(current: str) -> None:
+    nexts = next_statuses(current)
+    assert set(nexts) == TRANSITIONS[current]  # same policy, no second copy
+    assert nexts == sorted(nexts, key=ORDER.index)  # stable display order
+    assert all(can_move(current, new) for new in nexts)
+
+
+def test_final_states_offer_nothing() -> None:
+    assert all(next_statuses(status) == [] for status in FINAL)
+
+
+def test_applied_offers_the_happy_path_first() -> None:
+    assert next_statuses("applied") == ["test", "interview", "rejected", "withdrawn"]

@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, StringConstraints
 
-from app.schemas.drive import DriveState
+from app.schemas.drive import DriveState, StudentDriveOut
 
 Status = Literal["interested", "applied", "test", "interview", "offer", "rejected", "withdrawn"]
 Notes = Annotated[str, StringConstraints(strip_whitespace=True, max_length=2_000)]
@@ -34,6 +34,17 @@ class ApplicationOut(BaseModel):
     notes: str | None
     updated_at: datetime
     timeline: list[EventOut]
+    # Moves the server will accept from `status` (state_machine.next_statuses). The
+    # frontend draws one button per entry instead of keeping its own copy of the rules.
+    next_statuses: list[Status]
+
+
+class StudentDriveDetailOut(StudentDriveOut):
+    """GET /drives/{id}: the drive, the notice, and this student's tracker for it."""
+
+    raw_text: str  # the original notice, only on the detail page (it can be long)
+    application: ApplicationOut | None  # null = not tracking this drive yet
+    next_statuses: list[Status]  # the starts when not tracking, else application's moves
 
 
 class TrackedDriveOut(BaseModel):

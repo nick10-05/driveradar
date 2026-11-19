@@ -389,6 +389,8 @@ export interface components {
             updated_at: string;
             /** Timeline */
             timeline: components["schemas"]["EventOut"][];
+            /** Next Statuses */
+            next_statuses: ("interested" | "applied" | "test" | "interview" | "offer" | "rejected" | "withdrawn")[];
         };
         /** BranchOut */
         BranchOut: {
@@ -682,7 +684,10 @@ export interface components {
              */
             invite_code: string;
         };
-        /** StudentDriveDetailOut */
+        /**
+         * StudentDriveDetailOut
+         * @description GET /drives/{id}: the drive, the notice, and this student's tracker for it.
+         */
         StudentDriveDetailOut: {
             /**
              * Id
@@ -718,6 +723,9 @@ export interface components {
             reasons: string[];
             /** Raw Text */
             raw_text: string;
+            application: components["schemas"]["ApplicationOut"] | null;
+            /** Next Statuses */
+            next_statuses: ("interested" | "applied" | "test" | "interview" | "offer" | "rejected" | "withdrawn")[];
         };
         /**
          * StudentDriveOut
@@ -805,6 +813,8 @@ export interface components {
             updated_at: string;
             /** Timeline */
             timeline: components["schemas"]["EventOut"][];
+            /** Next Statuses */
+            next_statuses: ("interested" | "applied" | "test" | "interview" | "offer" | "rejected" | "withdrawn")[];
             drive: components["schemas"]["TrackedDriveOut"];
         };
         /** UserOut */

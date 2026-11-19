@@ -42,3 +42,34 @@ export function formatCtc(ctcText: string | null, ctcLpa: number | null): string
   if (ctcLpa !== null) return `${ctcLpa} LPA`;
   return null;
 }
+
+const istParts = new Intl.DateTimeFormat("en-CA", {
+  timeZone: IST,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
+/**
+ * UTC ISO → the "YYYY-MM-DDTHH:mm" an <input type="datetime-local"> holds, in IST.
+ * (The input itself has no timezone; the admin always types IST wall-clock time.)
+ */
+export function toISTInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const parts = Object.fromEntries(
+    istParts.formatToParts(new Date(iso)).map((p) => [p.type, p.value]),
+  );
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+}
+
+/**
+ * The input's IST wall-clock value → an ISO string with an explicit +05:30 offset, so the
+ * server never has to guess (it would also read a naive time as IST, DESIGN §4.5).
+ */
+export function fromISTInput(value: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return null;
+  return `${value}:00+05:30`;
+}

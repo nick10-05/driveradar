@@ -3,15 +3,11 @@
 from datetime import datetime
 
 from app.models import Application, Drive
-from app.schemas.application import ApplicationOut, TrackerEntryOut
-from app.schemas.drive import (
-    AdminDriveOut,
-    EligibilityRulesOut,
-    StudentDriveDetailOut,
-    StudentDriveOut,
-)
+from app.schemas.application import ApplicationOut, StudentDriveDetailOut, TrackerEntryOut
+from app.schemas.drive import AdminDriveOut, EligibilityRulesOut, StudentDriveOut
 from app.services.drives import drive_state
 from app.services.eligibility import EligibilityResult
+from app.services.state_machine import next_statuses
 
 
 def application_view(application: Application) -> ApplicationOut:
@@ -44,6 +40,7 @@ def _application_fields(application: Application) -> dict[str, object]:
             {"from_status": e.from_status, "to_status": e.to_status, "at": e.at}
             for e in application.events
         ],
+        "next_statuses": next_statuses(application.status),
     }
 
 
@@ -89,7 +86,7 @@ def student_view(drive: Drive, result: EligibilityResult, now: datetime) -> Stud
 
 
 def student_detail_view(
-    drive: Drive, result: EligibilityResult, now: datetime
+    drive: Drive, result: EligibilityResult, application: Application | None, now: datetime
 ) -> StudentDriveDetailOut:
     return StudentDriveDetailOut.model_validate(
         {
@@ -97,5 +94,7 @@ def student_detail_view(
             "eligible": result.eligible,
             "reasons": result.reasons,
             "raw_text": drive.raw_text,
+            "application": application_view(application) if application else None,
+            "next_statuses": next_statuses(application.status if application else None),
         }
     )

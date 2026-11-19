@@ -1,4 +1,4 @@
-import { Navigate } from "react-router";
+import { Link, Navigate } from "react-router";
 
 import { isApiError, type Schemas } from "../api/client";
 import { describeError, useDrives, useMe } from "../api/queries";
@@ -17,7 +17,10 @@ export function FeedPage() {
   const drives = useDrives(hasProfile);
 
   // No profile → the API answers 409; don't even ask, send them to the form.
-  if (me.data && !hasProfile) return <Navigate to="/profile" replace />;
+  // An admin (the TPO, not in the batch) has no profile and works in the admin area.
+  if (me.data && !hasProfile) {
+    return <Navigate to={me.data.role === "admin" ? "/admin" : "/profile"} replace />;
+  }
   if (drives.isError && isApiError(drives.error, 409)) return <Navigate to="/profile" replace />;
 
   if (drives.isPending) return <p className="status">Loading drives…</p>;
@@ -82,7 +85,9 @@ function DriveCard({ drive }: { drive: Drive }) {
   return (
     <li className={`card drive ${drive.eligible ? "" : "is-ineligible"}`}>
       <div className="drive-head">
-        <h3>{drive.company}</h3>
+        <h3>
+          <Link to={`/drives/${drive.id}`}>{drive.company}</Link>
+        </h3>
         <span className={`badge ${drive.eligible ? "ok" : "no"}`}>
           {drive.eligible ? "Eligible" : "Not eligible"}
         </span>
