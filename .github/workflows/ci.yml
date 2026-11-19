@@ -70,6 +70,11 @@ jobs:
       - name: Type check
         run: uv run mypy app evals
 
+      # DESIGN §7.6: the committed frontend/openapi.json is the API contract the frontend's
+      # types come from. An API change without a re-export fails here.
+      - name: OpenAPI schema is up to date (drift check)
+        run: uv run python -m app.scripts.export_openapi --check
+
       - name: Migrations apply cleanly to an empty database
         run: |
           uv run alembic upgrade head
@@ -156,6 +161,44 @@ jobs:
       - name: Container logs (on failure)
         if: failure()
         run: docker logs api || true
+
+  frontend:
+    name: Frontend (types from OpenAPI, lint, tests, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies (exactly the lockfile)
+        run: npm ci --no-audit --no-fund
+
+      # Regenerate the TS types from the committed openapi.json: if they differ from the
+      # committed schema.d.ts, someone re-exported the API but didn't regenerate.
+      - name: Generated API types are up to date
+        run: |
+          npm run gen:api
+          git diff --exit-code -- src/api/schema.d.ts
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check (a breaking API change fails here)
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      - name: Production build
+        run: npx vite build
 
   pre-commit:
     name: Pre-commit hooks

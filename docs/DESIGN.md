@@ -7,6 +7,9 @@ Status: **v2.2, decisions locked** (2026-11-18). Change decisions here first, th
 
 ## Changelog
 
+### v2.2 notes (Day 6, 2026-11-19)
+- §7.6: the exported schema lives at `frontend/openapi.json` (committed); `export_openapi --check` is the CI drift check, and the CI `frontend` job regenerates `src/api/schema.d.ts` and fails on a diff, then lint, `tsc`, vitest, build. D2: frontend tooling (Node 24) runs natively on Windows (signed `node.exe`; esbuild/rolldown binaries verified to run under Smart App Control); Python and git stay in WSL. TypeScript pinned to 5.9 (openapi-typescript needs `^5`, typescript-eslint `<6.1`). Session cookie never touched by JS; `RequireAuth` is UX only; post-login redirect comes from router state, validated to internal paths.
+
 ### v2.2 notes (Day 5, 2026-11-19)
 - §5 F4: `applied → interview` allowed (no test round); only `interested`/`applied` can start tracking; same status = notes-only update, no event. §6: `applications.created_at`, FKs `ON DELETE CASCADE`, `application_events.at DEFAULT clock_timestamp()` (`now()` is frozen per transaction, so two moves in one transaction would tie). §4.9: synthetic notices (labelled `synthetic`) until real ones exist; each notice has an `as_of` date; the eval CLI reads only `LLM_*` (`LlmSettings`) + `DATABASE_URL` and writes no `extraction_runs` rows.
 
