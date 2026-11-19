@@ -20,7 +20,7 @@ from app.core.config import Settings, load_config
 from app.core.db import create_engine
 from app.core.rate_limit import AuthLimiters
 from app.factory import create_app
-from tests.helpers import with_database_url
+from tests.helpers import INVITE_CODE, with_database_url
 
 ALEMBIC_INI = Path(__file__).resolve().parent.parent / "alembic.ini"
 
@@ -30,7 +30,7 @@ VALID_ENV: dict[str, str] = {
     # Postgres is running (locally or in CI). Real-DB tests use TEST_DATABASE_URL explicitly.
     "DATABASE_URL": "postgresql://driveradar:driveradar@127.0.0.1:1/driveradar",
     "ALLOWED_ORIGINS": "http://localhost:5173",
-    "BATCH_INVITE_CODE": "invite-code-123",
+    "BATCH_INVITE_CODE": INVITE_CODE,
     "CRON_SECRET": "cron-secret-0123456789",
 }
 

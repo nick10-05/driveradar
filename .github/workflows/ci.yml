@@ -82,6 +82,10 @@ jobs:
       - name: Tests (incl. Postgres integration) with coverage
         run: uv run pytest -q --cov --cov-report=term-missing
 
+      # DESIGN §7.6: 80% overall (enforced above via pyproject), 90% on business logic.
+      - name: Coverage of app/services is at least 90%
+        run: uv run coverage report --include='app/services/*' --fail-under=90
+
   docker:
     name: Docker image (build + smoke test)
     runs-on: ubuntu-latest

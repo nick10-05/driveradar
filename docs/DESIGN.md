@@ -7,6 +7,9 @@ Status: **v2.2, decisions locked** (2026-11-18). Change decisions here first, th
 
 ## Changelog
 
+### v2.2 notes (Day 3, 2026-11-19)
+- §5 F2: allowed drive status changes written down. §6: `drives.created_by` is `ON DELETE SET NULL`; `extraction_run_id` arrives with `extraction_runs` on Day 4. §8: `GET /admin/drives` (+ `/{id}`) added for the admin review screen; feed is 409 until the profile is saved.
+
 ### v2.2 (2026-11-18)
 - **Roadmap:** milestones M0–M9 are replaced by a **10-day roadmap (Day 1–Day 10)** (§10). A "Day" is a unit of work, not a calendar date. It can take several sittings, and the real dates go in PROGRESS.md.
 - **Compression:** drives + eligibility are one day (Day 3), and evals + tracker are one day (Day 5). All major features stay.
@@ -220,6 +223,7 @@ Every extraction attempt is stored: provider, model, prompt version, status, out
 ### F2. Drives (admin)
 - Paste notice → extract → draft + flagged fields → review/correct → save draft → publish.
 - Stored `status`: `draft` → `published` → `closed`. **`closed` is set only by an admin** (cancelled, filled, withdrawn).
+- Allowed status changes (Day 3): draft → published (only with a future deadline, else 422), published → closed (sets `closed_at`). Anything else is 409. A closed drive is final and read-only. Create always makes a draft.
 - **Expired is computed, never stored:** `status = 'published' AND deadline <= now()`. Extending a deadline reopens a drive automatically, and there's no closing job to fail or run late.
 - Feed and reminders show only open drives (`published` and deadline in the future). Expired drives stay visible in the tracker history.
 
@@ -319,8 +323,8 @@ drives(
   raw_text           text NOT NULL,
   status             text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','closed')),
   closed_at          timestamptz,              -- set only by a manual close
-  extraction_run_id  uuid REFERENCES extraction_runs(id),
-  created_by         uuid REFERENCES users(id),
+  extraction_run_id  uuid REFERENCES extraction_runs(id),  -- added on Day 4 with extraction_runs
+  created_by         uuid REFERENCES users(id) ON DELETE SET NULL,
   created_at         timestamptz NOT NULL DEFAULT now(),
   updated_at         timestamptz NOT NULL DEFAULT now()
 )
@@ -472,12 +476,14 @@ GET    /me                       PUT  /me/profile
 POST   /me/telegram-link         -> returns deep link (15-min one-time token)
 GET    /branches                 -> branch codes + names
 
-GET    /drives                   -> open drives + eligibility result per drive
-GET    /drives/{id}
+GET    /drives                   -> open drives + eligibility result per drive (409 until profile saved)
+GET    /drives/{id}              -> published or closed drive + notice text (drafts: 404)
 
 POST   /admin/drives/extract     -> raw_text in; draft fields + per-field issues + extraction_run_id out (no drive saved)
+GET    /admin/drives             -> every drive, drafts included (for the review screen)
+GET    /admin/drives/{id}
 POST   /admin/drives             -> create draft (optionally linked to an extraction run)
-PATCH  /admin/drives/{id}        -> edit / publish / close
+PATCH  /admin/drives/{id}        -> edit / publish / close (only the fields sent change)
 
 PUT    /drives/{id}/application  -> create or move status (state machine)
 GET    /me/applications          -> my tracker, with timeline

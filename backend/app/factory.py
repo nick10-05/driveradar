@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api import auth, branches, health, me
+from app.api import admin_drives, auth, branches, drives, health, me
 from app.core.config import Settings
 from app.core.db import create_engine, create_sessionmaker
 from app.core.errors import register_error_handlers
@@ -50,4 +50,6 @@ def create_app(settings: Settings) -> FastAPI:
     app.include_router(auth.router)
     app.include_router(me.router)
     app.include_router(branches.router)
+    app.include_router(drives.router)
+    app.include_router(admin_drives.router)
     return app

@@ -58,3 +58,13 @@ async def current_user(request: Request, session: DbSession, settings: AppSettin
 
 
 CurrentUser = Annotated[User, Depends(current_user)]
+
+
+async def current_admin(user: CurrentUser) -> User:
+    """401 if not logged in (via current_user), 403 if logged in but not an admin."""
+    if user.role != "admin":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Admins only")
+    return user
+
+
+CurrentAdmin = Annotated[User, Depends(current_admin)]

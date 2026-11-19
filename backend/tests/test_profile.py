@@ -9,27 +9,9 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import StudentProfile
-from tests.conftest import VALID_ENV
+from tests.helpers import profile, sign_in
 
 pytestmark = [pytest.mark.anyio, pytest.mark.db]
-
-PASSWORD = "correct horse battery"  # noqa: S105 - fake test value
-
-
-async def sign_in(api: httpx.AsyncClient, email: str = "asha@example.com") -> None:
-    register = {
-        "email": email,
-        "password": PASSWORD,
-        "name": "Asha Rao",
-        "invite_code": VALID_ENV["BATCH_INVITE_CODE"],
-    }
-    assert (await api.post("/auth/register", json=register)).status_code == 201
-    login = {"email": email, "password": PASSWORD}
-    assert (await api.post("/auth/login", json=login)).status_code == 200
-
-
-def profile(**overrides: Any) -> dict[str, Any]:
-    return {"branch_code": "CSE", "cgpa": 7.5, "active_backlogs": 0, "grad_year": 2027} | overrides
 
 
 async def test_me_has_no_profile_until_one_is_saved(api: httpx.AsyncClient) -> None:
