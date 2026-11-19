@@ -1,0 +1,20 @@
+{
+  "id": "synthetic-06",
+  "synthetic": true,
+  "source": "portal",
+  "as_of": "2026-11-19",
+  "note": "Explicit non-IST timezone (PST = UTC-8), CTC in rupees (convert to 18 LPA), combined branch text 'CSE/IT'.",
+  "raw_text": "Litware Inc (US) - Software Engineer, Remote\nCTC: Rs. 18,00,000 per annum\nOpen to B.Tech CSE/IT, 2027 graduates, CGPA >= 7.5\nApply before Dec 10, 2026 9:00 AM PST via https://litware.example/careers/se",
+  "expected": {
+    "company": "Litware Inc",
+    "role_title": "Software Engineer",
+    "location": "Remote",
+    "apply_link": "https://litware.example/careers/se",
+    "ctc_lpa": 18,
+    "deadline": "2026-12-10T17:00:00Z",
+    "min_cgpa": 7.5,
+    "max_active_backlogs": null,
+    "grad_years": [2027],
+    "allowed_branches": ["CSE", "IT"]
+  }
+}

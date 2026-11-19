@@ -7,6 +7,9 @@ Status: **v2.2, decisions locked** (2026-11-18). Change decisions here first, th
 
 ## Changelog
 
+### v2.2 notes (Day 5, 2026-11-19)
+- §5 F4: `applied → interview` allowed (no test round); only `interested`/`applied` can start tracking; same status = notes-only update, no event. §6: `applications.created_at`, FKs `ON DELETE CASCADE`, `application_events.at DEFAULT clock_timestamp()` (`now()` is frozen per transaction, so two moves in one transaction would tie). §4.9: synthetic notices (labelled `synthetic`) until real ones exist; each notice has an `as_of` date; the eval CLI reads only `LLM_*` (`LlmSettings`) + `DATABASE_URL` and writes no `extraction_runs` rows.
+
 ### v2.2 notes (Day 4, 2026-11-19)
 - §4.5: "all branches" = no restriction; all-unknown branches flagged as widening. §4.6: partial output only after the one retry; extractor exceptions caught. §6: `extraction_runs.error` (short code); `drives.extraction_run_id ON DELETE SET NULL`. Extraction limit: 30 per hour per admin; `/extract` always returns 200 with a (possibly empty) draft.
 
@@ -213,6 +216,10 @@ Every extraction attempt is stored: provider, model, prompt version, status, out
 - Results are saved to `evals/results/<date>-<provider>-<model>-<prompt_version>.md` and summarised in the README.
 - Run by hand (₹0 with a local model or free tier). CI runs the harness against `FakeExtractor` only, to test the harness code itself.
 - Baseline row: `none` (manual entry, nothing pre-filled), so the README can show what AI adds.
+- Until real notices arrive, the set holds hand-written `synthetic-*.json` notices (`"synthetic": true`), each targeting one rule (percentage instead of CGPA, "all branches", unknown branch, explicit timezone, no deadline, prompt-injection line). Reports state the synthetic/real count and never present synthetic scores as real accuracy.
+- Each notice has an `as_of` date used as "today" (prompt) and `now` (normaliser), so re-runs give the same expectations.
+- Field outcomes: correct / missed / wrong (stated in the notice) and abstained / hallucinated (not stated). Headline numbers: stated-field accuracy and hallucination rate, reported separately.
+- The CLI loads only `LlmSettings` (the `LLM_*` variables) and `DATABASE_URL` (for real branch aliases). It calls the extractor + normaliser directly and writes no `extraction_runs` rows.
 
 ## 5. Features (v1)
 
@@ -240,12 +247,13 @@ Every extraction attempt is stored: provider, model, prompt version, status, out
 
 ### F4. Application status tracking (state machine)
 ```
-INTERESTED → APPLIED → TEST → INTERVIEW → OFFER
-                │        │        │
-                └────────┴────────┴──→ REJECTED
+INTERESTED → APPLIED → (TEST →) INTERVIEW → OFFER
+                │        │          │
+                └────────┴──────────┴──→ REJECTED
 Any non-final state ──→ WITHDRAWN
 ```
-- Allowed transitions live in one dict. Any other move returns HTTP 409.
+- Allowed transitions live in one dict. Any other move returns HTTP 409. `APPLIED → INTERVIEW` skips the test (many drives have none). Tracking starts at INTERESTED or APPLIED. OFFER, REJECTED, WITHDRAWN are final.
+- Only published drives can be tracked (a draft is 404). Same status again = notes update, no event. Concurrent first clicks are safe: `INSERT … ON CONFLICT DO NOTHING`, then the row is locked `FOR UPDATE`.
 - Every change is written to `application_events`, giving each drive a timeline.
 
 ### F5. Telegram bot alerts
@@ -349,20 +357,21 @@ drive_allowed_branches(                        -- no rows = all branches
 
 applications(
   id          uuid PK,
-  student_id  uuid NOT NULL REFERENCES users(id),
-  drive_id    uuid NOT NULL REFERENCES drives(id),
-  status      text NOT NULL,
-  notes       text,
+  student_id  uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  drive_id    uuid NOT NULL REFERENCES drives(id) ON DELETE CASCADE,
+  status      text NOT NULL CHECK (status IN (...F4 statuses...)),
+  notes       text,                          -- ≤ 2000 chars (API)
+  created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now(),
   UNIQUE(student_id, drive_id)
 )
 
 application_events(
   id             uuid PK,
-  application_id uuid NOT NULL REFERENCES applications(id),
-  from_status    text,
+  application_id uuid NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+  from_status    text,                       -- NULL = tracking started
   to_status      text NOT NULL,
-  at             timestamptz NOT NULL DEFAULT now()
+  at             timestamptz NOT NULL DEFAULT clock_timestamp()
 )
 
 notifications(

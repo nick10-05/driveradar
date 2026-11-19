@@ -1,0 +1,20 @@
+{
+  "id": "synthetic-04",
+  "synthetic": true,
+  "source": "telegram",
+  "as_of": "2026-11-19",
+  "note": "Announcement without a deadline or eligibility rules: everything unstated must stay null.",
+  "raw_text": "Tailspin Labs will hold a pre-placement talk next week for the Backend Developer role. Package: 12 LPA. Registration details will be shared soon.",
+  "expected": {
+    "company": "Tailspin Labs",
+    "role_title": "Backend Developer",
+    "location": null,
+    "apply_link": null,
+    "ctc_lpa": 12,
+    "deadline": null,
+    "min_cgpa": null,
+    "max_active_backlogs": null,
+    "grad_years": [],
+    "allowed_branches": []
+  }
+}

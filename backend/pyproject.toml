@@ -27,7 +27,7 @@ dev = [
 [tool.ruff]
 target-version = "py313"
 line-length = 100
-src = ["app", "tests"]
+src = ["app", "tests", "evals"]
 
 [tool.ruff.lint]
 select = [
@@ -45,11 +45,11 @@ select = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]  # assert is how pytest works
 # Generated migrations: the template imports op/sa for every file, even empty ones,
-# and "Revises: " is blank for the first migration.
-"alembic/versions/*" = ["F401", "W291"]
+# and "Revises: " is blank for the first migration. Long CHECK strings can't be wrapped.
+"alembic/versions/*" = ["F401", "W291", "E501"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["app", "tests"]
+known-first-party = ["app", "tests", "evals"]
 known-third-party = ["alembic"]  # the local alembic/ folder is not our package
 
 # ---------------------------------------------------------------- mypy

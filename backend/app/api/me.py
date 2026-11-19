@@ -1,12 +1,16 @@
-"""The logged-in user's own data: GET /me, PUT /me/profile."""
+"""The logged-in user's own data: GET /me, PUT /me/profile, GET /me/applications."""
 
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import CurrentUser, DbSession
+from app.api.drive_views import tracker_entry_view
 from app.models import User
+from app.schemas.application import TrackerEntryOut
 from app.schemas.profile import MeOut, ProfileIn, ProfileOut
+from app.services.applications import list_applications
 from app.services.profiles import UnknownBranchError, get_profile, save_profile
 
 router = APIRouter(prefix="/me", tags=["me"])
@@ -24,6 +28,14 @@ def me_out(user: User, profile: ProfileOut | None) -> MeOut:
 async def get_me(user: CurrentUser, session: DbSession) -> MeOut:
     profile = await get_profile(session, user.id)
     return me_out(user, ProfileOut.from_model(profile) if profile else None)
+
+
+@router.get("/applications", responses=NOT_LOGGED_IN)
+async def get_my_applications(user: CurrentUser, session: DbSession) -> list[TrackerEntryOut]:
+    """My tracker: every drive I track, with its current status and timeline."""
+    now = datetime.now(UTC)
+    rows = await list_applications(session, user.id)
+    return [tracker_entry_view(application, drive, now) for application, drive in rows]
 
 
 @router.put(

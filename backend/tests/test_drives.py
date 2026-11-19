@@ -4,8 +4,7 @@ Day 3 "done when": an admin publishes a drive; the feed shows eligible / ineligi
 drives with reasons.
 """
 
-from collections.abc import AsyncIterator
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 import httpx
@@ -16,53 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings
 from app.models import Drive, DriveEligibility
 from tests.conftest import api_client
-from tests.helpers import profile, sign_in, sign_in_as_admin
+from tests.helpers import create, iso, new_drive, publish, sign_in
 
 pytestmark = [pytest.mark.anyio, pytest.mark.db]
-
-
-def iso(delta: timedelta) -> str:
-    return (datetime.now(UTC) + delta).isoformat()
-
-
-def new_drive(**overrides: Any) -> dict[str, Any]:
-    return {
-        "company": "Acme Corp",
-        "role_title": "Software Engineer",
-        "deadline": iso(timedelta(days=7)),
-        "raw_text": "Acme Corp is hiring Software Engineers. Apply by next week.",
-    } | overrides
-
-
-@pytest.fixture
-async def admin(settings: Settings, db_session: AsyncSession) -> AsyncIterator[httpx.AsyncClient]:
-    async with api_client(settings, db_session) as client:
-        await sign_in_as_admin(client, db_session)
-        yield client
-
-
-@pytest.fixture
-async def student(settings: Settings, db_session: AsyncSession) -> AsyncIterator[httpx.AsyncClient]:
-    """A logged-in student with a profile: CSE, CGPA 7.5, no backlogs, 2027."""
-    async with api_client(settings, db_session) as client:
-        await sign_in(client, "student@example.com")
-        assert (await client.put("/me/profile", json=profile())).status_code == 200
-        yield client
-
-
-async def create(admin: httpx.AsyncClient, **overrides: Any) -> dict[str, Any]:
-    response = await admin.post("/admin/drives", json=new_drive(**overrides))
-    assert response.status_code == 201, response.text
-    body: dict[str, Any] = response.json()
-    return body
-
-
-async def publish(admin: httpx.AsyncClient, **overrides: Any) -> dict[str, Any]:
-    drive = await create(admin, **overrides)
-    response = await admin.patch(f"/admin/drives/{drive['id']}", json={"status": "published"})
-    assert response.status_code == 200, response.text
-    body: dict[str, Any] = response.json()
-    return body
 
 
 # ---------------------------------------------------------------- access control

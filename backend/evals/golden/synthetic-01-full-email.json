@@ -1,0 +1,20 @@
+{
+  "id": "synthetic-01",
+  "synthetic": true,
+  "source": "email",
+  "as_of": "2026-11-19",
+  "note": "Complete, well-formed TPO email. Deadline with time, no timezone (IST).",
+  "raw_text": "Dear Students,\n\nNorthwind Systems is visiting for campus recruitment.\n\nRole: Graduate Engineer Trainee\nCTC: 4.5 LPA\nLocation: Pune\n\nEligibility:\n- Branches: CSE, IT, ECE, EEE\n- CGPA 6.5 and above\n- No active backlogs\n- 2027 passing out batch only\n\nRegister at https://careers.northwind.example/apply on or before 25 November 2026, 11:59 PM.\n\nRegards,\nTraining and Placement Office",
+  "expected": {
+    "company": "Northwind Systems",
+    "role_title": "Graduate Engineer Trainee",
+    "location": "Pune",
+    "apply_link": "https://careers.northwind.example/apply",
+    "ctc_lpa": 4.5,
+    "deadline": "2026-11-25T18:29:00Z",
+    "min_cgpa": 6.5,
+    "max_active_backlogs": 0,
+    "grad_years": [2027],
+    "allowed_branches": ["CSE", "ECE", "EEE", "IT"]
+  }
+}

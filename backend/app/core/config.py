@@ -69,13 +69,32 @@ def normalize_database_url(raw: str) -> tuple[str, bool]:
     return normalized.render_as_string(hide_password=False), sslmode in _SSL_REQUIRED_MODES
 
 
-class Settings(BaseSettings):
+class LlmSettings(BaseSettings):
+    """Only the LLM_* variables (D10). The eval CLI loads just these; Settings extends it."""
+
     model_config = SettingsConfigDict(
         env_ignore_empty=True,  # `TELEGRAM_BOT_TOKEN=` in .env means "not set"
         extra="ignore",
         frozen=True,
     )
 
+    llm_provider: Literal["none", "openai_compatible"] = "none"
+    llm_base_url: HttpUrl | None = None
+    llm_model: str | None = None
+    llm_api_key: SecretStr | None = None
+    llm_json_mode: Literal["schema", "object"] = "schema"
+    llm_timeout_seconds: float = Field(default=30, gt=0, le=120)
+
+    @model_validator(mode="after")
+    def _llm_provider_needs_endpoint(self) -> Self:
+        if self.llm_provider != "none" and (self.llm_base_url is None or not self.llm_model):
+            raise ValueError(
+                f"LLM_BASE_URL and LLM_MODEL must be set when LLM_PROVIDER={self.llm_provider}"
+            )
+        return self
+
+
+class Settings(LlmSettings):
     environment: Literal["dev", "test", "prod"]
 
     database_url: SecretStr
@@ -92,13 +111,6 @@ class Settings(BaseSettings):
 
     telegram_bot_token: SecretStr | None = None
     telegram_webhook_secret: SecretStr | None = None
-
-    llm_provider: Literal["none", "openai_compatible"] = "none"
-    llm_base_url: HttpUrl | None = None
-    llm_model: str | None = None
-    llm_api_key: SecretStr | None = None
-    llm_json_mode: Literal["schema", "object"] = "schema"
-    llm_timeout_seconds: float = Field(default=30, gt=0, le=120)
 
     @model_validator(mode="before")
     @classmethod
@@ -146,14 +158,6 @@ class Settings(BaseSettings):
     def _insecure_cookie_only_in_dev(self) -> Self:
         if not self.session_cookie_secure and self.environment != "dev":
             raise ValueError("SESSION_COOKIE_SECURE=false is only allowed when ENVIRONMENT=dev")
-        return self
-
-    @model_validator(mode="after")
-    def _llm_provider_needs_endpoint(self) -> Self:
-        if self.llm_provider != "none" and (self.llm_base_url is None or not self.llm_model):
-            raise ValueError(
-                f"LLM_BASE_URL and LLM_MODEL must be set when LLM_PROVIDER={self.llm_provider}"
-            )
         return self
 
 

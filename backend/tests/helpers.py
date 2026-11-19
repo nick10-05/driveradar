@@ -1,5 +1,6 @@
 """Small helpers shared by test modules (fixtures live in conftest.py)."""
 
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -47,3 +48,34 @@ async def sign_in_as_admin(
 
 def profile(**overrides: Any) -> dict[str, Any]:
     return {"branch_code": "CSE", "cgpa": 7.5, "active_backlogs": 0, "grad_year": 2027} | overrides
+
+
+# ---------------------------------------------------------------- drives (admin client)
+
+
+def iso(delta: timedelta) -> str:
+    return (datetime.now(UTC) + delta).isoformat()
+
+
+def new_drive(**overrides: Any) -> dict[str, Any]:
+    return {
+        "company": "Acme Corp",
+        "role_title": "Software Engineer",
+        "deadline": iso(timedelta(days=7)),
+        "raw_text": "Acme Corp is hiring Software Engineers. Apply by next week.",
+    } | overrides
+
+
+async def create(admin: httpx.AsyncClient, **overrides: Any) -> dict[str, Any]:
+    response = await admin.post("/admin/drives", json=new_drive(**overrides))
+    assert response.status_code == 201, response.text
+    body: dict[str, Any] = response.json()
+    return body
+
+
+async def publish(admin: httpx.AsyncClient, **overrides: Any) -> dict[str, Any]:
+    drive = await create(admin, **overrides)
+    response = await admin.patch(f"/admin/drives/{drive['id']}", json={"status": "published"})
+    assert response.status_code == 200, response.text
+    body: dict[str, Any] = response.json()
+    return body

@@ -21,7 +21,7 @@ from app.core.db import create_engine
 from app.core.rate_limit import AuthLimiters, SlidingWindowLimiter
 from app.factory import create_app
 from app.services.extraction.extractors import Extractor
-from tests.helpers import INVITE_CODE, with_database_url
+from tests.helpers import INVITE_CODE, profile, sign_in, sign_in_as_admin, with_database_url
 
 ALEMBIC_INI = Path(__file__).resolve().parent.parent / "alembic.ini"
 
@@ -119,6 +119,23 @@ async def api(settings: Settings, db_session: AsyncSession) -> AsyncIterator[htt
     Secure cookie over plain http.
     """
     async with api_client(settings, db_session) as client:
+        yield client
+
+
+@pytest.fixture
+async def admin(settings: Settings, db_session: AsyncSession) -> AsyncIterator[httpx.AsyncClient]:
+    """A logged-in admin client."""
+    async with api_client(settings, db_session) as client:
+        await sign_in_as_admin(client, db_session)
+        yield client
+
+
+@pytest.fixture
+async def student(settings: Settings, db_session: AsyncSession) -> AsyncIterator[httpx.AsyncClient]:
+    """A logged-in student with a profile: CSE, CGPA 7.5, no backlogs, 2027."""
+    async with api_client(settings, db_session) as client:
+        await sign_in(client, "student@example.com")
+        assert (await client.put("/me/profile", json=profile())).status_code == 200
         yield client
 
 

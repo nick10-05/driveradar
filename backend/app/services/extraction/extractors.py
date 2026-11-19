@@ -26,7 +26,7 @@ import httpx
 import structlog
 from pydantic import ValidationError
 
-from app.core.config import Settings
+from app.core.config import LlmSettings
 from app.schemas.drive import IST
 from app.services.extraction.prompt import build_messages, retry_message
 from app.services.extraction.schema import ExtractedNotice, ExtractionResult
@@ -100,7 +100,7 @@ class HttpJsonExtractor:
         api_key: str | None,
         json_mode: str,
         timeout_seconds: float,
-        today: Callable[[], date] = lambda: datetime.now(IST).date(),
+        today: Callable[[], date] | None = None,
     ) -> None:
         self._client = client
         self._url = base_url.rstrip("/") + "/chat/completions"
@@ -108,7 +108,7 @@ class HttpJsonExtractor:
         self._headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
         self._json_mode = json_mode
         self._timeout = timeout_seconds
-        self._today = today
+        self._today = today or (lambda: datetime.now(IST).date())
 
     async def extract(self, raw_text: str) -> ExtractionResult:
         usage = _Usage()
@@ -208,7 +208,9 @@ class _Usage:
             self.output_tokens = (self.output_tokens or 0) + completion
 
 
-def build_extractor(settings: Settings, client: httpx.AsyncClient) -> Extractor:
+def build_extractor(
+    settings: LlmSettings, client: httpx.AsyncClient, today: Callable[[], date] | None = None
+) -> Extractor:
     if settings.llm_provider == "none":
         return ManualExtractor()
     # The config validator guarantees base URL + model are set for this provider.
@@ -222,4 +224,5 @@ def build_extractor(settings: Settings, client: httpx.AsyncClient) -> Extractor:
         api_key=api_key,
         json_mode=settings.llm_json_mode,
         timeout_seconds=settings.llm_timeout_seconds,
+        today=today,
     )

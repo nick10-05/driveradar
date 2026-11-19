@@ -16,9 +16,11 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.deps import CurrentUser, DbSession
-from app.api.drive_views import student_detail_view, student_view
+from app.api.drive_views import application_view, student_detail_view, student_view
 from app.models import StudentProfile, User
+from app.schemas.application import ApplicationIn, ApplicationOut
 from app.schemas.drive import StudentDriveDetailOut, StudentDriveOut
+from app.services.applications import IllegalMoveError, TrackerDriveNotFoundError, set_status
 from app.services.drives import DriveNotFoundError, facts_of, feed, get_drive, rules_of
 from app.services.eligibility import check_eligibility
 from app.services.profiles import get_profile
@@ -60,3 +62,35 @@ async def get_one_drive(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Drive not found") from None
     result = check_eligibility(facts_of(profile), rules_of(drive))
     return student_detail_view(drive, result, datetime.now(UTC))
+
+
+@router.put(
+    "/{drive_id}/application",
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"description": "Not logged in"},
+        status.HTTP_404_NOT_FOUND: {"description": "No such drive"},
+        status.HTTP_409_CONFLICT: {"description": "Status change not allowed"},
+    },
+)
+async def put_application(
+    drive_id: uuid.UUID, data: ApplicationIn, user: CurrentUser, session: DbSession
+) -> ApplicationOut:
+    """Start tracking this drive, or move to a new status (state machine, DESIGN §5 F4).
+
+    PUT because the client states the desired status; sending the current status again
+    changes nothing (it can update the notes). An illegal move returns 409.
+    """
+    try:
+        application = await set_status(
+            session,
+            user.id,
+            drive_id,
+            data.status,
+            data.notes,
+            update_notes="notes" in data.model_fields_set,
+        )
+    except TrackerDriveNotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Drive not found") from None
+    except IllegalMoveError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None
+    return application_view(application)

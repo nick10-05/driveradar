@@ -1,0 +1,20 @@
+{
+  "id": "synthetic-02",
+  "synthetic": true,
+  "source": "whatsapp",
+  "as_of": "2026-11-19",
+  "note": "Terse WhatsApp forward. Percentage instead of CGPA (must abstain), all branches, monthly stipend (no LPA figure), year-less deadline.",
+  "raw_text": "*Contoso Analytics* is hiring Data Analyst Interns 🚀\nStipend: 25k/month\nAll branches eligible | 2027 & 2028 batch\n60% throughout academics\nRegister: https://forms.example/contoso-interns\nLast date: 2 Dec, 5 pm",
+  "expected": {
+    "company": "Contoso Analytics",
+    "role_title": "Data Analyst Intern",
+    "location": null,
+    "apply_link": "https://forms.example/contoso-interns",
+    "ctc_lpa": null,
+    "deadline": "2026-12-02T11:30:00Z",
+    "min_cgpa": null,
+    "max_active_backlogs": null,
+    "grad_years": [2027, 2028],
+    "allowed_branches": []
+  }
+}

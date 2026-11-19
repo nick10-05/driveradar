@@ -1,8 +1,9 @@
-"""ORM Drive → response models, shared by the student and admin routers."""
+"""ORM Drive / Application → response models, shared by the routers."""
 
 from datetime import datetime
 
-from app.models import Drive
+from app.models import Application, Drive
+from app.schemas.application import ApplicationOut, TrackerEntryOut
 from app.schemas.drive import (
     AdminDriveOut,
     EligibilityRulesOut,
@@ -11,6 +12,39 @@ from app.schemas.drive import (
 )
 from app.services.drives import drive_state
 from app.services.eligibility import EligibilityResult
+
+
+def application_view(application: Application) -> ApplicationOut:
+    return ApplicationOut.model_validate(_application_fields(application))
+
+
+def tracker_entry_view(application: Application, drive: Drive, now: datetime) -> TrackerEntryOut:
+    return TrackerEntryOut.model_validate(
+        {
+            **_application_fields(application),
+            "drive": {
+                "id": drive.id,
+                "company": drive.company,
+                "role_title": drive.role_title,
+                "deadline": drive.deadline,
+                "state": drive_state(drive, now),
+            },
+        }
+    )
+
+
+def _application_fields(application: Application) -> dict[str, object]:
+    return {
+        "id": application.id,
+        "drive_id": application.drive_id,
+        "status": application.status,
+        "notes": application.notes,
+        "updated_at": application.updated_at,
+        "timeline": [
+            {"from_status": e.from_status, "to_status": e.to_status, "at": e.at}
+            for e in application.events
+        ],
+    }
 
 
 def _common(drive: Drive, now: datetime) -> dict[str, object]:

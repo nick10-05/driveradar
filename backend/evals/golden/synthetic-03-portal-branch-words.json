@@ -1,0 +1,20 @@
+{
+  "id": "synthetic-03",
+  "synthetic": true,
+  "source": "portal",
+  "as_of": "2026-11-19",
+  "note": "Branches written out in words (alias mapping), CTC range (lower bound), date without a time (23:59 IST), backlog limit above zero.",
+  "raw_text": "Company: Fabrikam Motors\nPosition: Design Engineer\nEligible branches: Mechanical Engineering, Civil Engineering, Electrical and Electronics Engineering\nMinimum CGPA: 7.0\nMaximum active backlogs: 1\nCTC: 6-8 LPA\nJob location: Chennai\nLast date to apply: 30/11/2026",
+  "expected": {
+    "company": "Fabrikam Motors",
+    "role_title": "Design Engineer",
+    "location": "Chennai",
+    "apply_link": null,
+    "ctc_lpa": 6,
+    "deadline": "2026-11-30T18:29:00Z",
+    "min_cgpa": 7.0,
+    "max_active_backlogs": 1,
+    "grad_years": [],
+    "allowed_branches": ["CE", "EEE", "ME"]
+  }
+}
