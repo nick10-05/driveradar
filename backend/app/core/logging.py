@@ -120,5 +120,6 @@ def configure_logging(settings: Settings) -> None:
     logging.getLogger("uvicorn.access").disabled = True
     # httpx logs every request URL at INFO, and Telegram's Bot API puts the bot token in
     # the URL (/bot<token>/sendMessage). WARNING keeps the token out of the logs.
-    for name in ("httpx", "httpcore"):
+    # httpx2/httpcore2 arrive via fastapi[standard]; silenced too, in case code moves to them.
+    for name in ("httpx", "httpcore", "httpx2", "httpcore2"):
         logging.getLogger(name).setLevel(logging.WARNING)

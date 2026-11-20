@@ -117,3 +117,14 @@ async def unlink_chat(session: AsyncSession, chat_id: int) -> None:
     )
     await session.commit()
     log.info("telegram_unlinked", reason="blocked")
+
+
+async def clear_expired_link_tokens(session: AsyncSession, now: datetime | None = None) -> int:
+    """Forget link tokens nobody used in time (run by the reminder cron). Returns how many."""
+    result = await session.execute(
+        update(StudentProfile)
+        .where(StudentProfile.telegram_link_expires_at <= (now or datetime.now(UTC)))
+        .values(telegram_link_token_hash=None, telegram_link_expires_at=None)
+    )
+    await session.commit()
+    return int(result.rowcount)  # type: ignore[attr-defined]

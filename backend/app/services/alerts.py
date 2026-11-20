@@ -1,6 +1,7 @@
 """Telegram alerts: "a drive you're eligible for was just published" (DESIGN §5 F5).
 
-Deadline reminders (24 h / 3 h) come on Day 9 and reuse send_once().
+Deadline reminders (services/reminders.py) reuse send_once(), drive_text() and the
+linked-student list from here.
 
 Interview notes:
 - Runs as a FastAPI background task after the publish response is sent, so the admin
@@ -53,11 +54,21 @@ class AlertSummary:
     failed: int = 0
     blocked: int = 0
 
+    def count(self, result: SendResult | None) -> None:
+        if result is None:
+            self.skipped += 1
+        elif result is SendResult.SENT:
+            self.sent += 1
+        elif result is SendResult.BLOCKED:
+            self.blocked += 1
+        else:
+            self.failed += 1
 
-def new_drive_text(drive: Drive, app_base_url: HttpUrl | None) -> str:
+
+def drive_text(heading: str, drive: Drive, app_base_url: HttpUrl | None) -> str:
     """Plain text (no parse_mode), so nothing in a company name can format or inject."""
     deadline = drive.deadline.astimezone(IST).strftime("%d %b %Y, %I:%M %p IST")
-    lines = ["New drive you're eligible for", f"{drive.company} - {drive.role_title}"]
+    lines = [heading, f"{drive.company} - {drive.role_title}"]
     if drive.ctc_text:
         lines.append(f"CTC: {drive.ctc_text}")
     if drive.location:
@@ -66,6 +77,18 @@ def new_drive_text(drive: Drive, app_base_url: HttpUrl | None) -> str:
     if app_base_url is not None:
         lines.append(f"{str(app_base_url).rstrip('/')}/drives/{drive.id}")
     return "\n".join(lines)
+
+
+def new_drive_text(drive: Drive, app_base_url: HttpUrl | None) -> str:
+    return drive_text("New drive you're eligible for", drive, app_base_url)
+
+
+async def linked_profiles(session: AsyncSession) -> list[StudentProfile]:
+    """Every student who connected Telegram (eligibility is checked per drive by the caller)."""
+    result = await session.scalars(
+        select(StudentProfile).where(StudentProfile.telegram_chat_id.is_not(None))
+    )
+    return list(result.all())
 
 
 async def send_once(
@@ -117,14 +140,11 @@ async def send_new_drive_alerts(
 
         rules = rules_of(drive)
         text = new_drive_text(drive, app_base_url)
-        linked = await session.scalars(
-            select(StudentProfile).where(StudentProfile.telegram_chat_id.is_not(None))
-        )
         # (user_id, chat_id) pairs, read up front: send_once commits, which would expire
         # the ORM objects mid-loop.
         recipients = [
             (profile.user_id, profile.telegram_chat_id)
-            for profile in linked.all()
+            for profile in await linked_profiles(session)
             if profile.telegram_chat_id is not None
             and check_eligibility(facts_of(profile), rules).eligible
         ]
@@ -140,16 +160,25 @@ async def send_new_drive_alerts(
                 kind="new_drive",
                 text=text,
             )
-            if result is None:
-                summary.skipped += 1
-                continue
-            if result is SendResult.SENT:
-                summary.sent += 1
-            elif result is SendResult.BLOCKED:
-                summary.blocked += 1
-            else:
-                summary.failed += 1
-            await sleep(PAUSE_BETWEEN_SENDS)
+            summary.count(result)
+            if result is not None:
+                await sleep(PAUSE_BETWEEN_SENDS)
 
     log.info("new_drive_alerts_done", drive_id=str(drive_id), **vars(summary))
     return summary
+
+
+async def new_drive_alerts_task(
+    session_factory: SessionFactory,
+    telegram: TelegramClient,
+    drive_id: uuid.UUID,
+    app_base_url: HttpUrl | None,
+) -> None:
+    """The background-task entry point. It runs after the response was sent, so nobody is
+    there to see an exception: log one structured event (searchable in Render's logs)
+    instead of a bare traceback. Already-sent alerts stay recorded; a re-run can't
+    duplicate them."""
+    try:
+        await send_new_drive_alerts(session_factory, telegram, drive_id, app_base_url)
+    except Exception:
+        log.exception("new_drive_alerts_failed", drive_id=str(drive_id))

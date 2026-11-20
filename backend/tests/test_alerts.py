@@ -15,10 +15,11 @@ import respx
 from pydantic import HttpUrl
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from structlog.testing import capture_logs
 
 from app.core.config import Settings
 from app.models import Notification, StudentProfile, User
-from app.services.alerts import send_new_drive_alerts
+from app.services.alerts import new_drive_alerts_task, send_new_drive_alerts
 from app.services.telegram import TelegramClient
 from tests.conftest import api_client
 from tests.helpers import BOT_TOKEN, create, profile, sign_in, sign_in_as_admin
@@ -273,3 +274,17 @@ def same_session(session: AsyncSession) -> Any:
         yield session
 
     return factory
+
+
+async def test_a_crash_in_the_background_task_is_logged_not_raised(
+    telegram: TelegramClient,
+) -> None:
+    @asynccontextmanager
+    async def broken_db() -> AsyncIterator[AsyncSession]:
+        raise ConnectionError("database went away")
+        yield  # pragma: no cover
+
+    with capture_logs() as events:
+        await new_drive_alerts_task(broken_db, telegram, uuid.uuid4(), None)
+
+    assert [e["event"] for e in events if e["log_level"] == "error"] == ["new_drive_alerts_failed"]

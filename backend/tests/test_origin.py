@@ -57,8 +57,7 @@ def test_safe_methods_need_no_origin(client: TestClient) -> None:
 
 
 def test_secret_header_endpoints_are_exempt(client: TestClient) -> None:
-    # The route doesn't exist yet (Day 9): reaching the router (404) proves the check let
-    # it through, where any other POST without an Origin gets 403.
-    response = client.post("/internal/run-reminders")
-
-    assert response.status_code == 404
+    # No Origin header. The routes answer 401 (missing secret header), which proves the
+    # Origin check let the request through; any other POST without an Origin gets 403.
+    assert client.post("/internal/run-reminders").status_code == 401
+    assert client.post("/telegram/webhook").status_code == 404  # Telegram off in tests

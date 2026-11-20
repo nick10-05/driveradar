@@ -7,6 +7,9 @@ Status: **v2.2, decisions locked** (2026-11-18). Change decisions here first, th
 
 ## Changelog
 
+### v2.2 notes (Day 9, 2026-11-20)
+- §5 F5: reminder windows are (now, now+24 h] and (now, now+3 h], inclusive at the far edge; a drive already inside 3 h gets only the 3 h reminder. Reminders go only to students with no tracker or status `interested` (applied and every later status, incl. rejected/withdrawn, are skipped), eligible, linked, open drives. `POST /internal/run-reminders`: `X-Cron-Secret` header (constant-time, router dependency, 401), runs synchronously and returns counts; Telegram off = cleanup only. Cleanup = delete expired `user_sessions` + clear expired Telegram link tokens. `.github/workflows/reminders.yml`: every 30 min + manual, `permissions: {}`, curl retries (safe: exactly-once via `notifications`). Background new-drive task logs `new_drive_alerts_failed` instead of a bare traceback.
+
 ### v2.2 notes (Day 8, 2026-11-19)
 - §5 F5 / §7.2: Telegram is optional: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET` and `TELEGRAM_BOT_USERNAME` are all set or all empty (the app refuses a partial set); empty = no links, no alerts, webhook 404. `APP_BASE_URL` (optional) puts a drive link in alerts. The webhook secret is checked in a router dependency (before the body is parsed: 401, never 422) and only private chats can link. `/start` replies go in the webhook response body (no outbound call). A chat linked to another account moves to the newest one. `GET /me` adds `telegram_available`; `DELETE /me/telegram-link` disconnects. New-drive alerts: a background task after draft → published only (edits never re-alert), its own DB session; temporary send failure deletes the `notifications` row (retryable), 403 also unlinks the chat. Plain-text messages (no `parse_mode`). httpx/httpcore loggers at WARNING because the bot token is in Bot API URLs. `notifications` FKs `ON DELETE CASCADE`. Webhook registration: `app.scripts.set_telegram_webhook`.
 

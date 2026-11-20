@@ -121,3 +121,18 @@ async def end_session(session: AsyncSession, token: str) -> None:
         delete(UserSession).where(UserSession.token_hash == hash_session_token(token))
     )
     await session.commit()
+
+
+async def delete_expired_sessions(session: AsyncSession, now: datetime | None = None) -> int:
+    """Remove sessions past their expiry (run by the reminder cron). Returns how many.
+
+    Expired sessions already can't log anyone in (user_for_token checks expires_at), so this
+    is housekeeping: it keeps the table small and drops token hashes nobody can use.
+    """
+    result = await session.execute(
+        delete(UserSession).where(UserSession.expires_at <= (now or datetime.now(UTC)))
+    )
+    await session.commit()
+    count = int(result.rowcount)  # type: ignore[attr-defined]
+    log.info("expired_sessions_deleted", count=count)
+    return count

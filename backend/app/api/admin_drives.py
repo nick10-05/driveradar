@@ -32,7 +32,7 @@ from app.api.deps import (
 )
 from app.api.drive_views import admin_view
 from app.schemas.drive import AdminDriveOut, DriveCreate, DriveUpdate
-from app.services.alerts import send_new_drive_alerts
+from app.services.alerts import new_drive_alerts_task
 from app.services.drives import (
     DriveNotFoundError,
     DriveStateError,
@@ -169,6 +169,6 @@ async def patch(
         raise _unknown_branches(exc) from None
     if published_now and telegram is not None:
         background.add_task(
-            send_new_drive_alerts, session_factory, telegram, drive.id, settings.app_base_url
+            new_drive_alerts_task, session_factory, telegram, drive.id, settings.app_base_url
         )
     return admin_view(drive, datetime.now(UTC))

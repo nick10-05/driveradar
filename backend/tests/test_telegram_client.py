@@ -153,6 +153,8 @@ class TestTokenNeverLogged:
 
         assert not logging.getLogger("httpx").isEnabledFor(logging.INFO)
         assert not logging.getLogger("httpcore").isEnabledFor(logging.INFO)
+        assert not logging.getLogger("httpx2").isEnabledFor(logging.INFO)
+        assert not logging.getLogger("httpcore2").isEnabledFor(logging.INFO)
 
 
 class TestDependencies:

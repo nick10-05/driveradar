@@ -1,0 +1,47 @@
+# Reminder cron (DESIGN §5 F5): every 30 min, ask the backend to send due deadline
+# reminders and clean up expired sessions. Free on a public repo, nothing to host.
+#
+# Why GitHub Actions: Render's free instance sleeps when idle, so an in-process scheduler
+# wouldn't run. This HTTP call wakes it. GitHub's schedule can run late (often 5-20 min);
+# the backend uses time windows, so a late run still sends the right reminders.
+#
+# Setup: repo Settings → Secrets and variables → Actions → New repository secret
+# CRON_SECRET = the CRON_SECRET value from Render (driveradar-api → Environment).
+# Optional repository variable API_URL (default: the Render URL below).
+name: Reminders
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"  # UTC; GitHub may delay or skip runs under load
+  workflow_dispatch:  # "Run workflow" button, for testing
+
+permissions: {}  # the job only makes an outgoing HTTP call: no repo access at all
+
+concurrency:
+  group: reminders
+  cancel-in-progress: false  # let a running job finish; duplicates are harmless anyway
+
+jobs:
+  run:
+    name: Run reminders
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: POST /internal/run-reminders
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          API_URL: ${{ vars.API_URL || 'https://driveradar-api.onrender.com' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Repository secret CRON_SECRET is not set (see the comment at the top of this file)."
+            exit 1
+          fi
+          # Retries cover Render waking up (~30-60 s of 502s or timeouts). Retrying a POST is
+          # safe here: each reminder is sent at most once (notifications unique constraint).
+          # The secret goes in a header (never the URL) and is masked in the log by GitHub.
+          curl --silent --show-error --fail-with-body \
+            --retry 8 --retry-delay 15 --retry-all-errors \
+            --connect-timeout 20 --max-time 120 \
+            -X POST -H "X-Cron-Secret: ${CRON_SECRET}" \
+            "${API_URL%/}/internal/run-reminders"
+          echo

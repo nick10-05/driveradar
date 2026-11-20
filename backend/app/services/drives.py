@@ -110,14 +110,14 @@ def facts_of(profile: StudentProfile) -> StudentFacts:
 # ---------------------------------------------------------------- queries
 
 
-def _with_rules() -> Select[Drive]:
+def with_rules() -> Select[Drive]:
     return select(Drive).options(
         selectinload(Drive.eligibility), selectinload(Drive.allowed_branches)
     )
 
 
 async def get_drive(session: AsyncSession, drive_id: uuid.UUID, *, include_drafts: bool) -> Drive:
-    statement = _with_rules().where(Drive.id == drive_id)
+    statement = with_rules().where(Drive.id == drive_id)
     if not include_drafts:
         statement = statement.where(Drive.status != "draft")
     drive = await session.scalar(statement.execution_options(populate_existing=True))
@@ -128,14 +128,14 @@ async def get_drive(session: AsyncSession, drive_id: uuid.UUID, *, include_draft
 
 async def list_all_drives(session: AsyncSession) -> Sequence[Drive]:
     """Admin list: every drive, newest first."""
-    return (await session.scalars(_with_rules().order_by(Drive.created_at.desc()))).all()
+    return (await session.scalars(with_rules().order_by(Drive.created_at.desc()))).all()
 
 
 async def feed(
     session: AsyncSession, profile: StudentProfile
 ) -> list[tuple[Drive, EligibilityResult]]:
     """Open drives (published, deadline in the future): eligible first, then by deadline."""
-    statement = _with_rules().where(Drive.status == "published", Drive.deadline > func.now())
+    statement = with_rules().where(Drive.status == "published", Drive.deadline > func.now())
     drives = (await session.scalars(statement)).all()
     student = facts_of(profile)
     results = [(drive, check_eligibility(student, rules_of(drive))) for drive in drives]
