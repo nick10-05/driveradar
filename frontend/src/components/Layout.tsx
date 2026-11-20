@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from "react-router";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 
 import { useLogout, useMe } from "../api/queries";
 
@@ -6,6 +6,7 @@ export function Layout() {
   const me = useMe();
   const logout = useLogout();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const isAdmin = me.data?.role === "admin";
 
   return (
@@ -32,7 +33,8 @@ export function Layout() {
         </nav>
       </header>
       {me.data && <p className="greeting">Hi, {me.data.name}</p>}
-      <main>
+      {/* Keyed by path: each route remounts and plays the CSS page-in animation. */}
+      <main key={pathname} className="page">
         <Outlet />
       </main>
     </div>

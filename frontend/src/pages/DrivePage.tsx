@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router";
 
 import { isApiError, type Schemas } from "../api/client";
 import { describeError, useDrive, useSetApplication, type Status } from "../api/queries";
+import { Loading } from "../components/Loading";
 import { formatCtc, formatDeadlineIST, timeLeft } from "../lib/format";
 import { DRIVE_STATE_LABEL, ENDS_TRACKING, MOVE_LABEL, STATUS_LABEL } from "../lib/status";
 
@@ -10,7 +11,7 @@ export function DrivePage() {
   const { id = "" } = useParams();
   const drive = useDrive(id);
 
-  if (drive.isPending) return <p className="status">Loading…</p>;
+  if (drive.isPending) return <Loading count={1} />;
   if (drive.isError) {
     const message = isApiError(drive.error, 404) ? "This drive doesn't exist." : describeError(drive.error);
     return (

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate } from "react-router";
 
 import { describeError, useLogin, useMe, useRegister } from "../api/queries";
+import { AuthHero } from "../components/AuthHero";
 
 export function RegisterPage() {
   const me = useMe();
@@ -33,7 +34,7 @@ export function RegisterPage() {
 
   return (
     <main className="auth-page">
-      <h1>DriveRadar</h1>
+      <AuthHero />
       <form onSubmit={onSubmit} className="card form">
         <h2>Create an account</h2>
         <label>

@@ -11,6 +11,7 @@ import {
   useMe,
   useUpdateDrive,
 } from "../api/queries";
+import { Loading } from "../components/Loading";
 import { formatDeadlineIST } from "../lib/format";
 import { DRIVE_STATE_LABEL } from "../lib/status";
 import { DriveForm } from "./DriveForm";
@@ -35,7 +36,7 @@ export function AdminDrivesPage() {
           + New from notice
         </Link>
       </div>
-      {drives.isPending && <p className="status">Loading…</p>}
+      {drives.isPending && <Loading />}
       {drives.isError && (
         <p className="status error" role="alert">
           {describeError(drives.error)}
@@ -171,7 +172,7 @@ export function AdminDrivePage() {
   const [dirty, setDirty] = useState(false);
   const [rawText, setRawText] = useState<string | null>(null);
 
-  if (drive.isPending) return <p className="status">Loading…</p>;
+  if (drive.isPending) return <Loading count={1} />;
   if (drive.isError) {
     return (
       <p className="status error" role="alert">

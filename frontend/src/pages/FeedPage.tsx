@@ -2,6 +2,7 @@ import { Link, Navigate } from "react-router";
 
 import { isApiError, type Schemas } from "../api/client";
 import { describeError, useDrives, useMe } from "../api/queries";
+import { Loading } from "../components/Loading";
 import { formatCtc, formatDeadlineIST, isUrgent, timeLeft } from "../lib/format";
 
 type Drive = Schemas["StudentDriveOut"];
@@ -23,7 +24,7 @@ export function FeedPage() {
   }
   if (drives.isError && isApiError(drives.error, 409)) return <Navigate to="/profile" replace />;
 
-  if (drives.isPending) return <p className="status">Loading drives…</p>;
+  if (drives.isPending) return <Loading label="Loading drives…" />;
   if (drives.isError) {
     return (
       <p className="status error" role="alert">
@@ -51,6 +52,7 @@ export function FeedPage() {
   return (
     <section>
       <h1>Open drives</h1>
+      <p className="lede">Eligible first, then by deadline. Times in IST.</p>
       <h2>
         You're eligible <span className="count">{eligible.length}</span>
       </h2>

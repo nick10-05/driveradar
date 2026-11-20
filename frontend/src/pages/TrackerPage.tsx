@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 
 import { describeError, useApplications } from "../api/queries";
+import { Loading } from "../components/Loading";
 import { formatDeadlineIST } from "../lib/format";
 import { DRIVE_STATE_LABEL, STATUS_LABEL } from "../lib/status";
 import { Timeline } from "./DrivePage";
@@ -9,7 +10,7 @@ import { Timeline } from "./DrivePage";
 export function TrackerPage() {
   const applications = useApplications();
 
-  if (applications.isPending) return <p className="status">Loading…</p>;
+  if (applications.isPending) return <Loading />;
   if (applications.isError) {
     return (
       <p className="status error" role="alert">

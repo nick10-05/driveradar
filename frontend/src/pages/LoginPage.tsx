@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from "react-router";
 
 import { describeError, useLogin, useMe } from "../api/queries";
 import { safeRedirect } from "../auth/RequireAuth";
+import { AuthHero } from "../components/AuthHero";
 
 export function LoginPage() {
   const me = useMe();
@@ -22,8 +23,7 @@ export function LoginPage() {
 
   return (
     <main className="auth-page">
-      <h1>DriveRadar</h1>
-      <p className="muted">Placement drives for your batch, filtered for you.</p>
+      <AuthHero />
       <form onSubmit={onSubmit} className="card form">
         <h2>Log in</h2>
         <label>
