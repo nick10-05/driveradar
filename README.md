@@ -1,13 +1,31 @@
-# DriveRadar
+<p align="center">
+  <a href="https://driveradar-mocha.vercel.app"><img src="docs/assets/banner.svg" alt="DriveRadar: every placement drive in one feed, filtered by each student's eligibility" width="100%"></a>
+</p>
 
-[![CI](https://github.com/nick10-05/driveradar/actions/workflows/ci.yml/badge.svg)](https://github.com/nick10-05/driveradar/actions/workflows/ci.yml)
-[![Reminders](https://github.com/nick10-05/driveradar/actions/workflows/reminders.yml/badge.svg)](https://github.com/nick10-05/driveradar/actions/workflows/reminders.yml)
+<p align="center">
+  <a href="https://github.com/nick10-05/driveradar/actions/workflows/ci.yml"><img src="https://github.com/nick10-05/driveradar/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/nick10-05/driveradar/actions/workflows/reminders.yml"><img src="https://github.com/nick10-05/driveradar/actions/workflows/reminders.yml/badge.svg" alt="Reminders"></a>
+  <img src="https://img.shields.io/badge/coverage-99%25-10B981" alt="99% backend coverage">
+  <img src="https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white" alt="Python 3.13">
+  <img src="https://img.shields.io/badge/FastAPI-async-009688?logo=fastapi&logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React 19">
+  <img src="https://img.shields.io/badge/hosting-%E2%82%B90%2Fmonth-22D3EE" alt="Runs at ₹0 a month">
+</p>
+
+<p align="center">
+  <b><a href="https://driveradar-mocha.vercel.app">Live app</a></b> (invite-only for the batch) ·
+  <a href="docs/DESIGN.md">Design doc</a>
+</p>
 
 **One feed of campus placement drives for my college batch**, filtered by each student's
 eligibility, with AI-assisted notice extraction, an application tracker and Telegram
 alerts before deadlines. Runs in production at **₹0/month**.
 
-Live (invite-only for the batch): https://driveradar-mocha.vercel.app
+## ⚡ At a glance
+
+| 🤖 AI with guardrails | 🎯 Eligibility engine | 🔔 Alerts that never double-send | 🧪 Production quality |
+|---|---|---|---|
+| The LLM only extracts fields, each backed by a quote from the notice; a human approves every drive | One pure, unit-tested function decides eligibility for both the feed and the alerts, with exact reasons | A GitHub Actions cron and a `UNIQUE` constraint give exactly-once Telegram reminders, 24 h and 3 h out | 99% backend coverage on real Postgres, typed API client generated from OpenAPI, strict CSP |
 
 <p>
   <img src="docs/screenshots/feed-mobile.png" width="240" alt="Student feed: eligible drives first, deadlines in IST">
@@ -15,13 +33,13 @@ Live (invite-only for the batch): https://driveradar-mocha.vercel.app
   <img src="docs/screenshots/tracker-mobile.png" width="240" alt="Application tracker with statuses">
 </p>
 
-## The problem
+## 🎯 The problem
 
 Placement notices reach a batch from four places: TPO emails, WhatsApp forwards, the
 college portal and Telegram channels. Students miss deadlines, can't tell quickly which
 drives they qualify for, and track applications in their heads.
 
-## What it does
+## ✨ What it does
 
 | For students | For the placement admin |
 |---|---|
@@ -36,7 +54,7 @@ drives they qualify for, and track applications in their heads.
   <img src="docs/screenshots/admin-review-desktop.png" width="400" alt="Admin review form for a drive">
 </p>
 
-## Architecture
+## 🧩 Architecture
 
 ```mermaid
 flowchart LR
@@ -67,7 +85,7 @@ flowchart LR
 
 Full design and decisions: [`docs/DESIGN.md`](docs/DESIGN.md).
 
-## The AI boundary
+## 🤖 The AI boundary
 
 The LLM is a text-to-fields parser and nothing more:
 
@@ -85,7 +103,7 @@ notice text ─▶ Extractor ─▶ ExtractedNotice ─▶ normaliser ─▶ dra
 - **Provider-independent and optional:** `LLM_PROVIDER=none` (the default) means manual entry. Any extractor failure falls back to manual entry. No vendor SDK, no LangChain.
 - The notice is wrapped as data, not instructions. The golden set includes a prompt-injection notice.
 
-## Measuring the AI
+## 📊 Measuring the AI
 
 `evals/` holds a golden set of labelled notices (synthetic for now; real ones get anonymised
 before they're added) and a runner that reports per-field accuracy, abstention, hallucination
@@ -98,11 +116,10 @@ uv run python -m evals.run    # by hand, never in CI (CI never calls a real LLM)
 | Extractor | Stated fields extracted | Unstated fields invented | Invalid output | Notes |
 |---|---|---|---|---|
 | `none` (manual entry baseline) | 0% | 0% | 0% | [results](backend/evals/results/2026-11-19-none-none-v1.md) |
-| Real model | TBD | TBD | TBD | Needs a free, no-card LLM key; no code changes |
 
-The baseline is the "nothing pre-filled" row, so a model run shows exactly what the AI adds.
+The baseline is the "nothing pre-filled" row, so any model run shows exactly what the AI adds. Plugging in a real model needs only an API key, with no code changes.
 
-## Security
+## 🔐 Security
 
 - **Auth:** opaque DB sessions (SHA-256-hashed token) in a `__Host-session` cookie (HttpOnly, Secure, SameSite=Lax). No JWT, no refresh tokens. Argon2id passwords. Registration needs the batch invite code.
 - **Split hosting without third-party cookies:** Vercel rewrites `/api/*` to Render, so the browser only talks to one origin. No CORS.
@@ -112,7 +129,7 @@ The baseline is the "nothing pre-filled" row, so a model run shows exactly what 
 - **Secrets:** env vars only, fail-fast config, redacted logs. The bot token is kept out of the HTTP client logs.
 - **Frontend:** strict CSP (no inline scripts or styles), HSTS, nosniff, Referrer-Policy.
 
-## Reliable alerts on free hosting
+## 🔔 Reliable alerts on free hosting
 
 Free backends sleep, so an in-process scheduler can't be trusted:
 
@@ -120,7 +137,7 @@ Free backends sleep, so an in-process scheduler can't be trusted:
 - **Time windows:** the job selects deadlines *within* a window ("closes within the next 24 h"), never at an exact time, so a late run still works.
 - **Exactly once:** `notifications` has `UNIQUE(student, drive, kind)`. The job inserts the row first and sends only if the insert went in. Retries and overlapping runs never send twice, so the cron can retry while Render wakes up.
 
-## Trade-offs (what I chose not to build)
+## ⚖️ Trade-offs (what I chose not to build)
 
 | Choice | Why | What changes at 10× scale |
 |---|---|---|
@@ -130,7 +147,10 @@ Free backends sleep, so an in-process scheduler can't be trusted:
 | Opaque sessions, not JWT | Instant logout and revocation, no key management | Same, plus a session cache |
 | LLM optional, default `none` | No card anywhere; the app works without AI | A paid tier with higher limits |
 
-## Run it locally
+## 💻 Run it locally
+
+<details>
+<summary><b>Backend, frontend, demo data and checks</b></summary>
 
 Prereqs: Docker, Python 3.13 + [uv](https://docs.astral.sh/uv/), Node 24.
 
@@ -161,7 +181,12 @@ cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy
 cd frontend && npm run check && npm run build
 ```
 
-## Deploy (all free, no card)
+</details>
+
+## 🚀 Deploy (all free, no card)
+
+<details>
+<summary><b>Neon, Render, Vercel, Telegram and the reminder cron</b></summary>
 
 - **Neon:** Postgres. Use the *direct* host, not the pooler.
 - **Render:** the backend, from [`render.yaml`](render.yaml). Health check on `/healthz`; it auto-deploys when CI passes.
@@ -169,7 +194,8 @@ cd frontend && npm run check && npm run build
 - **Telegram:** create a bot with @BotFather, set the `TELEGRAM_*` vars on Render, then run `app.scripts.set_telegram_webhook`.
 - **Reminders:** add a `CRON_SECRET` repository secret to GitHub.
 
-## Status
+</details>
 
-Built in a 10-day roadmap (progress notes kept locally). Next ideas in DESIGN §12: company
-history, `.ics` deadline export, Telegram forward-to-draft, WhatsApp alerts.
+## 🗺️ Roadmap
+
+Next ideas (see DESIGN §12): company history, `.ics` deadline export, Telegram forward-to-draft, WhatsApp alerts.
